@@ -9,13 +9,14 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100..900&family=Noto+Sans:wght@100..900&family=Space+Grotesk:wght@100..900&display=swap"/>
   
-  <!-- Google Maps API -->
+  <!-- Maps & 3D Libraries -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDdN_b4vQ8l-RMcaJN9W-0fvPeciT9j-Io&libraries=geometry,places"></script>
-  <!-- Three.js CDN for 3D Vehicle Simulation Model -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
   <script id="tailwind-config">
     tailwind.config = {
       darkMode: "class",
@@ -71,12 +72,13 @@
     ::-webkit-scrollbar-thumb { background: #282d3c; border-radius: 4px; }
     ::-webkit-scrollbar-track { background: #080b11; }
     
-    @keyframes pulse-fast {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(1.15); }
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(1000%); }
     }
-    .animate-pulse-fast { animation: pulse-fast 1.2s infinite ease-in-out; }
+    .animate-scanline { animation: scanline 8s linear infinite; }
 
+    /* Range slider custom style */
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
       height: 18px;
@@ -91,20 +93,25 @@
       border-radius: 4px;
       background: #282d3c;
     }
+    
+    .list-hover-fx:hover {
+      background-color: rgba(40, 45, 60, 0.5);
+      border-color: rgba(0, 240, 255, 0.4);
+    }
   </style>
 </head>
 <body class="bg-background text-on-surface flex flex-col min-h-screen selection:bg-primary-container selection:text-black">
 
-  <header class="fixed top-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-xl pt-safe border-b border-surface-variant/40 shadow-lg">
+  <header class="fixed top-0 w-full z-40 bg-surface-container-lowest/95 backdrop-blur-xl pt-safe border-b border-surface-variant/40 shadow-lg">
     <div class="h-14 px-margin flex items-center justify-between gap-space-sm max-w-7xl mx-auto">
       <div class="flex items-center gap-2.5 min-w-0">
         <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary-container/20 via-surface-tint/30 to-primary-container flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(0,240,255,0.4)] border border-primary-container/50">
-          <span class="material-symbols-outlined text-black font-extrabold text-[22px]">local_shipping</span>
+          <span class="material-symbols-outlined text-black font-extrabold text-[22px]">directions_car</span>
         </div>
         <div class="flex flex-col min-w-0">
           <div class="flex items-center gap-1.5">
-            <span class="font-label-tactical text-[10px] text-primary-container font-bold uppercase tracking-wider">V2X 9-Fleet Hub</span>
-            <span class="px-1.5 py-0.2 text-[8px] font-label-tactical bg-primary-container/15 text-primary-container rounded border border-primary-container/30">전국 9대 상용차 관제</span>
+            <span class="font-label-tactical text-[10px] text-primary-container font-bold uppercase tracking-wider">V2X Autonomous Hub</span>
+            <span class="px-1.5 py-0.2 text-[8px] font-label-tactical bg-primary-container/15 text-primary-container rounded border border-primary-container/30">5G V2I Latency: 3.2ms</span>
           </div>
           <h1 id="header-page-title" class="font-headline-sm text-[15px] sm:text-headline-sm text-on-surface truncate font-bold">1. 실시간 도로망 경로 관제</h1>
         </div>
@@ -112,9 +119,9 @@
 
       <div class="flex items-center gap-2 shrink-0">
         <div class="hidden sm:flex items-center gap-1 bg-surface-container-high px-2 py-1 rounded-lg border border-surface-variant/50">
-          <span class="text-[10px] font-label-tactical text-outline">관제 차량:</span>
-          <select id="header-vehicle-select" onchange="selectVehicle(this.value)" class="bg-transparent text-primary-container font-label-tactical text-[11px] font-bold focus:outline-none cursor-pointer max-w-[210px] truncate">
-            <!-- Dynamically populated -->
+          <span class="text-[10px] font-label-tactical text-outline">선택 차량:</span>
+          <select id="header-vehicle-select" onchange="selectVehicle(this.value)" class="bg-transparent text-primary-container font-label-tactical text-[11px] font-bold focus:outline-none cursor-pointer max-w-[200px] truncate">
+            <!-- Options injected dynamically -->
           </select>
         </div>
         <button onclick="triggerEmergencyModal()" aria-label="긴급 비상 중단" class="px-3 py-1.5 bg-error/20 hover:bg-error/30 text-error border border-error/60 rounded-xl font-label-tactical text-[11px] flex items-center gap-1.5 active:scale-95 transition-all shadow-[0_0_12px_rgba(255,77,77,0.3)]">
@@ -126,14 +133,15 @@
   </header>
 
   <main class="flex-1 flex flex-col relative w-full pt-14 pb-20 bg-background min-h-screen max-w-7xl mx-auto">
-    <!-- PAGE 1: Map & Fleet Control -->
+    
     <div id="page-1" class="page-view flex flex-col w-full px-margin py-space-md gap-space-md text-on-surface">
+      <!-- Top Telemetry -->
       <section class="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full">
         <div class="bg-surface-container rounded-xl p-3 border border-surface-variant/50 flex justify-between items-center shadow-md">
           <div>
-            <span class="font-label-tactical text-[10px] text-outline block">총 투입 상용차</span>
-            <span class="font-telemetry-display text-[22px] text-primary-container font-bold" id="stat-total-trucks">9 대</span>
-            <span class="text-[9px] font-label-tactical text-outline block mt-0.5">부산 / 인천 / 서울 권역별 각 3대</span>
+            <span class="font-label-tactical text-[10px] text-outline block">총 관제 트럭</span>
+            <span class="font-telemetry-display text-[22px] text-primary-container font-bold">34 대</span>
+            <span class="text-[9px] font-label-tactical text-outline block mt-0.5">운행중 19대 / 대기 15대</span>
           </div>
           <div class="w-9 h-9 rounded-lg bg-primary-container/10 border border-primary-container/30 flex items-center justify-center text-primary-container">
             <span class="material-symbols-outlined text-[22px]">local_shipping</span>
@@ -141,8 +149,8 @@
         </div>
         <div class="bg-surface-container rounded-xl p-3 border border-surface-variant/50 flex justify-between items-center shadow-md">
           <div>
-            <span class="font-label-tactical text-[10px] text-outline block">물류 게이트</span>
-            <span class="font-telemetry-display text-[22px] text-success font-bold">7 개소</span>
+            <span class="font-label-tactical text-[10px] text-outline block">활성 무인게이트</span>
+            <span class="font-telemetry-display text-[22px] text-success font-bold">9 개소</span>
             <span class="text-[9px] font-label-tactical text-success/80 block mt-0.5">V2I 통신 정상 연결</span>
           </div>
           <div class="w-9 h-9 rounded-lg bg-success/10 border border-success/30 flex items-center justify-center text-success">
@@ -151,9 +159,9 @@
         </div>
         <div class="bg-surface-container rounded-xl p-3 border border-surface-variant/50 flex justify-between items-center shadow-md">
           <div>
-            <span class="font-label-tactical text-[10px] text-outline block">금일 배송 오더</span>
-            <span class="font-telemetry-display text-[22px] text-secondary font-bold">128 건</span>
-            <span class="text-[9px] font-label-tactical text-secondary/80 block mt-0.5">실시간 TOS 연동</span>
+            <span class="font-label-tactical text-[10px] text-outline block">일일 처리 오더</span>
+            <span class="font-telemetry-display text-[22px] text-secondary font-bold">186 건</span>
+            <span class="text-[9px] font-label-tactical text-secondary/80 block mt-0.5">TOS 시스템 동기화 완료</span>
           </div>
           <div class="w-9 h-9 rounded-lg bg-secondary/10 border border-secondary/30 flex items-center justify-center text-secondary">
             <span class="material-symbols-outlined text-[22px]">assignment</span>
@@ -161,9 +169,9 @@
         </div>
         <div class="bg-surface-container rounded-xl p-3 border border-surface-variant/50 flex justify-between items-center shadow-md">
           <div>
-            <span class="font-label-tactical text-[10px] text-outline block">V2X 통신 지연</span>
-            <span class="font-telemetry-display text-[22px] text-success font-bold">2.4 ms</span>
-            <span class="text-[9px] font-label-tactical text-success/80 block mt-0.5">5G 초저지연 안정</span>
+            <span class="font-label-tactical text-[10px] text-outline block">네트워크 상태</span>
+            <span class="font-telemetry-display text-[22px] text-success font-bold">안정</span>
+            <span class="text-[9px] font-label-tactical text-success/80 block mt-0.5">평균 지연시간 3.2ms</span>
           </div>
           <div class="w-9 h-9 rounded-lg bg-success/10 border border-success/30 flex items-center justify-center text-success">
             <span class="material-symbols-outlined text-[22px]">wifi_tethering</span>
@@ -176,90 +184,87 @@
           <div class="flex items-center gap-2">
             <span class="material-symbols-outlined text-primary-container text-[20px]">map</span>
             <div>
-              <span id="map-region-title" class="font-headline-sm text-[14px] text-on-surface font-bold block">권역별 상용차 운행 관제 (9대 차량 통합)</span>
-              <span class="text-[10px] font-label-tactical text-outline block">Google Maps API 기반 실시간 권역별 라우팅</span>
+              <span id="map-region-title" class="font-headline-sm text-[14px] text-on-surface font-bold block">권역별 도로망 자율주행 관제</span>
+              <span class="text-[10px] font-label-tactical text-outline block">Google Maps Directions API 기반 실제 도로 라우팅</span>
             </div>
           </div>
           <div class="flex items-center gap-1.5 flex-wrap">
-            <button onclick="changeRegion('busan')" id="btn-region-busan" class="region-btn bg-surface-container-highest text-primary-container font-label-tactical text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-primary-container/50 focus:outline-none cursor-pointer hover:bg-surface-variant transition-colors shadow-sm">
-              📍 부산 권역 (3대)
+            <button onclick="changeRegion('busan')" id="btn-region-busan" class="region-btn bg-surface-container-highest text-primary-container font-label-tactical text-[11px] font-bold px-2 py-1.5 rounded-lg border border-primary-container/50 focus:outline-none cursor-pointer hover:bg-surface-variant transition-colors shadow-sm">
+              📍 부산항 권역
             </button>
-            <button onclick="changeRegion('incheon')" id="btn-region-incheon" class="region-btn bg-surface-container-highest text-outline font-label-tactical text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-surface-variant/80 focus:outline-none cursor-pointer hover:bg-surface-variant transition-colors shadow-sm">
-              📍 인천 권역 (3대)
+            <button onclick="changeRegion('incheon')" id="btn-region-incheon" class="region-btn bg-surface-container-highest text-outline font-label-tactical text-[11px] font-bold px-2 py-1.5 rounded-lg border border-surface-variant/80 focus:outline-none cursor-pointer hover:bg-surface-variant transition-colors shadow-sm">
+              📍 인천/부천 권역
             </button>
-            <button onclick="changeRegion('seoul')" id="btn-region-seoul" class="region-btn bg-surface-container-highest text-outline font-label-tactical text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-surface-variant/80 focus:outline-none cursor-pointer hover:bg-surface-variant transition-colors shadow-sm">
-              📍 서울 강남 권역 (3대)
+            <button onclick="changeRegion('pyeongtaek')" id="btn-region-pyeongtaek" class="region-btn bg-surface-container-highest text-outline font-label-tactical text-[11px] font-bold px-2 py-1.5 rounded-lg border border-surface-variant/80 focus:outline-none cursor-pointer hover:bg-surface-variant transition-colors shadow-sm">
+              📍 평택/오산 권역
             </button>
           </div>
         </div>
 
-        <div class="relative w-full h-[440px] sm:h-[480px] bg-[#141824] overflow-hidden" id="google-map-container">
+        <div class="relative w-full h-[450px] sm:h-[500px] bg-[#141824] overflow-hidden" id="google-map-container">
           <div id="actual-map" class="w-full h-full absolute inset-0"></div>
-          
           <div class="absolute bottom-3 left-3 z-[10] bg-surface-container-lowest/90 backdrop-blur-md p-2.5 rounded-xl border border-surface-variant/60 shadow-lg font-label-tactical text-[10px]">
-            <span class="text-primary-container font-bold block mb-1">상용차 맵 범례 (총 9대)</span>
+            <span class="text-primary-container font-bold block mb-1">맵 범례</span>
             <div class="flex flex-col gap-1.5 mt-1">
-              <span class="flex items-center gap-2"><span class="w-6 h-1 bg-primary-container rounded"></span><span class="text-outline">지정 주행 경로</span></span>
-              <span class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-primary-container">local_shipping</span><span class="text-outline">포터 / 5톤 화물차</span></span>
+              <span class="flex items-center gap-2"><span class="w-6 h-1 bg-primary-container rounded"></span><span class="text-outline">Google 예상 경로</span></span>
+              <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full border border-primary-container bg-surface-container-high"></span><span class="text-outline">물류 게이트웨이</span></span>
+              <span class="flex items-center gap-2"><span class="material-symbols-outlined text-[12px] text-primary-container">local_shipping</span><span class="text-outline">관제 트럭 (Live)</span></span>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="flex flex-col gap-space-xs mt-1">
-        <div class="flex justify-between items-center">
-          <h3 class="font-headline-sm text-body-md font-bold text-on-surface">권역별 배정 상용차 목록 (현재 선택 권역: 3대)</h3>
-          <span class="text-[10px] font-label-tactical text-outline">카드를 눌러 관제 차량 및 3D 모델 전환</span>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-space-sm" id="fleet-cards-grid">
+      <section class="flex flex-col gap-space-xs mt-2">
+        <h3 class="font-headline-sm text-body-md font-bold text-on-surface">선택 권역 운행 트럭</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-space-sm" id="fleet-cards-grid">
           <!-- Rendered dynamically -->
         </div>
       </section>
     </div>
 
-    <!-- PAGE 2: 3D Truck Model & Teleoperation View -->
     <div id="page-2" class="page-view flex flex-col w-full px-margin py-space-md gap-space-md text-on-surface hidden">
-      <div class="w-full bg-surface-container rounded-xl p-3 border border-surface-variant/50 shadow-md flex items-center justify-between flex-wrap gap-2">
+      <div class="w-full bg-surface-container rounded-xl p-3 border border-surface-variant/50 shadow-md flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-primary-container/20 border border-primary-container flex items-center justify-center text-primary-container">
-            <span class="material-symbols-outlined text-[24px]">local_shipping</span>
+          <div class="w-10 h-10 rounded-xl bg-primary-container/20 border border-primary-container flex items-center justify-center text-primary-container shadow-[0_0_10px_rgba(0,240,255,0.3)]">
+            <span class="material-symbols-outlined text-[24px]">360</span>
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <span class="font-headline-sm text-body-md font-bold" id="teleop-active-id">포터 EV 탑차 (#PR-01)</span>
-              <span class="px-2 py-0.5 rounded font-label-tactical text-[9px] font-bold bg-success/20 text-success" id="teleop-active-mode">자율주행 중</span>
+              <span class="font-headline-sm text-body-md font-bold" id="teleop-active-id">선택된 차량 없음</span>
+              <span class="px-2 py-0.5 rounded font-label-tactical text-[9px] font-bold bg-surface-variant text-outline" id="teleop-active-mode">상태 대기</span>
             </div>
-            <p class="font-body-sm text-[11px] text-on-surface-variant mt-0.5" id="teleop-active-desc">실제 차량 외형 가상공간 렌더링 및 제어</p>
+            <p class="font-body-sm text-[11px] text-on-surface-variant mt-0.5" id="teleop-active-desc">차량을 선택해주세요</p>
           </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <select id="teleop-model-switcher" onchange="switchVehicleModelType(this.value)" class="bg-surface-container-high text-primary-container font-label-tactical text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-primary-container/40 focus:outline-none cursor-pointer">
-            <option value="porter">현대 포터 EV (택배/탑차)</option>
-            <option value="cargo5t">현대 5톤 카고/윙바디 트럭</option>
-          </select>
         </div>
       </div>
 
-      <!-- 3D Vehicle Simulation Viewport -->
-      <div class="w-full bg-surface-container-lowest rounded-xl overflow-hidden shadow-2xl border border-surface-variant/60 flex flex-col relative">
-        <div class="px-3.5 py-2 bg-surface-container-high border-b border-surface-variant/40 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-primary-container animate-ping"></span>
-            <span class="font-label-tactical text-[11px] font-bold text-primary-container" id="canvas-3d-title">3D 상용차 프레임 시뮬레이터 (9대 전용)</span>
+      <div class="w-full bg-surface-container-lowest rounded-xl overflow-hidden shadow-2xl border border-surface-variant/60 flex flex-col">
+        <div class="px-3 py-2 bg-surface-container-high border-b border-surface-variant/40 flex items-center justify-between overflow-x-auto gap-2">
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="material-symbols-outlined text-primary-container text-[18px]">camera</span>
+            <span class="font-label-tactical text-[11px] font-bold text-on-surface">POV 카메라 뷰:</span>
           </div>
-          <div class="flex items-center gap-1.5">
-            <button onclick="setCameraAngle('front')" class="px-2 py-1 bg-surface-container text-on-surface-variant hover:text-primary-container font-label-tactical text-[10px] rounded border border-surface-variant">전면뷰</button>
-            <button onclick="setCameraAngle('side')" class="px-2 py-1 bg-surface-container text-on-surface-variant hover:text-primary-container font-label-tactical text-[10px] rounded border border-surface-variant">측면섀시</button>
-            <button onclick="setCameraAngle('top')" class="px-2 py-1 bg-surface-container text-on-surface-variant hover:text-primary-container font-label-tactical text-[10px] rounded border border-surface-variant">탑뷰</button>
+          <div class="flex items-center gap-1 shrink-0" id="pov-button-group">
+            <button onclick="switchCameraPov('front')" id="pov-btn-front" class="px-2.5 py-1 text-[10px] font-label-tactical rounded bg-primary-container text-black font-bold">전방 대시</button>
+            <button onclick="switchCameraPov('surround')" id="pov-btn-surround" class="px-2.5 py-1 text-[10px] font-label-tactical rounded bg-surface-container text-on-surface-variant">360° 어라운드</button>
+            <button onclick="switchCameraPov('cargo')" id="pov-btn-cargo" class="px-2.5 py-1 text-[10px] font-label-tactical rounded bg-surface-container text-on-surface-variant">적재함 내부</button>
+            <button onclick="switchCameraPov('side')" id="pov-btn-side" class="px-2.5 py-1 text-[10px] font-label-tactical rounded bg-surface-container text-on-surface-variant">측면 블라인드</button>
           </div>
         </div>
 
-        <div class="relative w-full aspect-[16/9] sm:aspect-[21/9] bg-[#05070c] overflow-hidden flex items-center justify-center" id="three-canvas-container">
-          <!-- Three.js Canvas injected here -->
-          <div class="absolute bottom-3 right-3 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-variant/60 font-label-tactical text-[10px] text-outline flex items-center gap-2 pointer-events-none">
-            <span>마우스 드래그: 카메라 회전</span>
-            <span>|</span>
-            <span class="text-primary-container font-bold" id="teleop-speed-indicator">속도: 45 km/h</span>
+        <div class="relative w-full aspect-video sm:aspect-[21/9] bg-[#000] overflow-hidden flex items-center justify-center">
+          <img id="pov-video-feed" src="https://images.unsplash.com/photo-1520106212299-d99c443e4568?auto=format&fit=crop&w=1200&q=80" alt="Camera Feed" class="w-full h-full object-cover opacity-90 transition-opacity duration-300"/>
+          <div class="absolute inset-0 bg-gradient-to-b from-transparent via-primary-container/10 to-transparent pointer-events-none animate-scanline"></div>
+          
+          <div class="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-10 pointer-events-none">
+            <div class="flex items-center gap-2 bg-surface-container-lowest/85 backdrop-blur-md px-2.5 py-1 rounded border border-surface-variant/50">
+              <span class="w-2 h-2 rounded-full bg-success animate-ping"></span>
+              <span class="font-label-tactical text-[11px] text-primary-container font-bold" id="pov-cam-title">CAM #01 [FRONT]</span>
+            </div>
+            <div class="flex items-center gap-2 bg-surface-container-lowest/85 backdrop-blur-md px-2.5 py-1 rounded border border-surface-variant/50 text-[10px] font-label-tactical">
+              <span class="text-outline">지연:</span><span class="text-success font-bold">3.2 ms</span>
+              <span class="text-outline ml-1">속도:</span><span class="text-primary-container font-bold" id="pov-speed">0 km/h</span>
+            </div>
           </div>
         </div>
       </div>
@@ -267,52 +272,49 @@
       <!-- Control Panel -->
       <section class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
         <div class="bg-surface-container rounded-xl p-3 border border-surface-variant/50 flex flex-col gap-2">
-          <span class="font-label-tactical text-[10px] text-outline font-bold">변속 제어 (Gear)</span>
+          <span class="font-label-tactical text-[10px] text-outline font-bold">기어 (Gear Box)</span>
           <div class="grid grid-cols-4 gap-1.5" id="gear-selector-group">
-            <button onclick="setGear('P')" id="gear-P" class="gear-btn py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-sm active:scale-95">P</button>
-            <button onclick="setGear('R')" id="gear-R" class="gear-btn py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-sm active:scale-95">R</button>
-            <button onclick="setGear('N')" id="gear-N" class="gear-btn py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-sm active:scale-95">N</button>
-            <button onclick="setGear('D')" id="gear-D" class="gear-btn py-2.5 rounded-lg bg-primary-container text-black font-black text-sm active:scale-95">D</button>
+            <button onclick="setGear('P')" id="gear-P" class="gear-btn py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-sm active:scale-95 transition-colors">P</button>
+            <button onclick="setGear('R')" id="gear-R" class="gear-btn py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-sm active:scale-95 transition-colors">R</button>
+            <button onclick="setGear('N')" id="gear-N" class="gear-btn py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-sm active:scale-95 transition-colors">N</button>
+            <button onclick="setGear('D')" id="gear-D" class="gear-btn py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-sm active:scale-95 transition-colors">D</button>
           </div>
         </div>
         <div class="bg-surface-container rounded-xl p-3 border border-surface-variant/50 flex flex-col gap-2 justify-center">
           <div class="flex justify-between items-center">
-            <span class="font-label-tactical text-[10px] text-outline font-bold">조향 휠 (Steering Angle)</span>
-            <span class="font-telemetry-md text-[13px] font-bold text-primary-container" id="steerValDisplay">+0°</span>
+            <span class="font-label-tactical text-[10px] text-outline font-bold">조향 (Steering)</span>
+            <span class="font-telemetry-md text-[13px] font-bold text-primary-container" id="steerValDisplay">0°</span>
           </div>
-          <input class="w-full h-2.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer mt-1" id="steerSliderInput" max="35" min="-35" type="range" value="0" oninput="onSteerSliderChange(this.value)"/>
+          <input class="w-full h-2.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer mt-1" id="steerSliderInput" max="35" min="-35" type="range" value="0"/>
         </div>
         <div class="bg-surface-container rounded-xl p-3 border border-surface-variant/50 flex flex-col gap-2 justify-center">
           <button onclick="triggerEmergencyModal()" class="w-full py-2 bg-gradient-to-r from-error to-error-container text-white rounded-xl font-headline-sm text-[12px] font-bold flex items-center justify-center gap-1 shadow-lg active:scale-95">
-            <span class="material-symbols-outlined text-[18px]">power_settings_new</span> E-STOP 긴급정지
+            <span class="material-symbols-outlined text-[18px]">power_settings_new</span> E-STOP 발령
           </button>
-          <button onclick="releaseControlAndResumeAuto()" class="w-full py-1.5 bg-surface-container-high text-primary-container rounded-xl font-headline-sm text-[11px] font-bold border border-primary-container/30 active:scale-95">
-            자율주행 모드 복귀
+          <button onclick="releaseControlAndResumeAuto()" class="w-full py-1.5 bg-surface-container-high text-primary-container rounded-xl font-headline-sm text-[11px] font-bold border border-primary-container/30 hover:bg-surface-variant transition-colors active:scale-95">
+            자율주행 복귀
           </button>
         </div>
       </section>
     </div>
 
-    <!-- PAGE 3: Gate status -->
     <div id="page-3" class="page-view hidden flex-col w-full px-margin py-space-md gap-space-md text-on-surface">
       <div class="flex items-center justify-between">
-        <h2 class="font-headline-sm text-lg font-bold">무인 게이트 및 물류센터 V2I 연동</h2>
-        <span class="text-[10px] font-label-tactical bg-primary-container/10 text-primary-container px-2 py-1 rounded border border-primary-container/30">실시간 프로토콜 스캐닝</span>
+        <h2 class="font-headline-sm text-lg font-bold">무인게이트 V2I 연동 현황</h2>
+        <span class="text-[10px] font-label-tactical bg-primary-container/10 text-primary-container px-2 py-1 rounded border border-primary-container/30">실시간 스캐닝 중</span>
       </div>
-      
-      <div id="gate-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div id="gate-list-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <!-- Rendered dynamically -->
       </div>
     </div>
     
-    <!-- PAGE 4: TOS Orders (All 9 Vehicles) -->
     <div id="page-4" class="page-view hidden flex-col w-full px-margin py-space-md gap-space-md text-on-surface">
       <div class="flex items-center justify-between border-b border-surface-variant/50 pb-2">
         <div>
-          <h2 class="font-headline-sm text-lg font-bold">전국 9대 상용차 TOS 연동 배차 큐</h2>
-          <p class="text-[11px] font-label-tactical text-outline mt-0.5">부산, 인천, 서울 전 권역 포터 및 5톤 화물차 9대 실시간 오더</p>
+          <h2 class="font-headline-sm text-lg font-bold">TOS 연동 실시간 배차 큐</h2>
+          <p class="text-[11px] font-label-tactical text-outline mt-0.5">항만 시스템 인가 완료 오더 (항목 클릭 시 화물 3D 뷰어 오픈)</p>
         </div>
-        <button onclick="showNotification('TOS SYNC', '9대 차량 화물 오더 동기화 완료')" class="bg-surface-container px-3 py-1.5 rounded-lg border border-primary-container/40 text-primary-container text-[11px] font-label-tactical hover:bg-surface-variant transition-colors flex items-center gap-1">
+        <button class="bg-surface-container px-3 py-1.5 rounded-lg border border-primary-container/40 text-primary-container text-[11px] font-label-tactical hover:bg-surface-variant transition-colors flex items-center gap-1 shadow-sm">
           <span class="material-symbols-outlined text-[14px]">sync</span> 동기화
         </button>
       </div>
@@ -321,11 +323,12 @@
         <table class="w-full text-left font-label-tactical text-[11px] whitespace-nowrap">
           <thead class="bg-surface-container-high text-outline uppercase">
             <tr>
-              <th class="p-3 border-b border-surface-variant/50">오더 번호</th>
+              <th class="p-3 border-b border-surface-variant/50">오더 ID</th>
               <th class="p-3 border-b border-surface-variant/50">출발 ➔ 목적지</th>
-              <th class="p-3 border-b border-surface-variant/50">화물 규격</th>
-              <th class="p-3 border-b border-surface-variant/50">배정 상용차 (9대)</th>
-              <th class="p-3 border-b border-surface-variant/50">진행 상태</th>
+              <th class="p-3 border-b border-surface-variant/50">화물 유형</th>
+              <th class="p-3 border-b border-surface-variant/50">배정 차량</th>
+              <th class="p-3 border-b border-surface-variant/50">상태</th>
+              <th class="p-3 border-b border-surface-variant/50 text-center">3D 뷰</th>
             </tr>
           </thead>
           <tbody id="dispatch-table-body" class="divide-y divide-surface-variant/40">
@@ -335,64 +338,86 @@
       </div>
     </div>
     
-    <!-- PAGE 5: Vehicle Diagnostics with 9-Vehicle Selector & Issue Inspection -->
     <div id="page-5" class="page-view hidden flex-col w-full px-margin py-space-md gap-space-md text-on-surface">
-      <div class="flex items-center justify-between bg-surface-container p-3 rounded-xl border border-surface-variant/50 flex-wrap gap-2">
+      
+      <div class="flex items-center justify-between bg-surface-container p-3 rounded-xl border border-surface-variant/50 shadow-md">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-primary-container text-[24px]">build_circle</span>
           <div>
-            <h2 class="font-headline-sm text-base font-bold">상용차 9대 하드웨어 및 BMS 정밀 진단</h2>
-            <p class="text-[10px] font-label-tactical text-outline">차량을 선택하여 부품별 이상 유무 및 마모 상태 확인</p>
+            <h2 class="font-headline-sm text-base font-bold">차량 정밀 진단 시스템</h2>
+            <p class="text-[10px] font-label-tactical text-outline">모든 운행 차량의 배터리 및 부품 마모도 원격 진단</p>
           </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-[10px] font-label-tactical text-outline">진단 대상 차량:</span>
-          <select id="diag-vehicle-dropdown" onchange="onDiagnosticsVehicleChange(this.value)" class="bg-surface-container-high text-primary-container font-label-tactical text-[11px] font-bold px-3 py-1.5 rounded-lg border border-primary-container/40 focus:outline-none cursor-pointer">
-            <!-- Populated dynamically -->
-          </select>
         </div>
       </div>
 
-      <!-- Vehicle Quick Switch Tabs for Diagnostics -->
-      <div class="grid grid-cols-3 sm:grid-cols-9 gap-1.5" id="diag-quick-tabs">
-        <!-- Rendered dynamically -->
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <!-- BMS Status Card -->
-        <div class="bg-surface-container rounded-xl p-4 border border-surface-variant/50 flex flex-col gap-3">
-          <div class="flex justify-between items-center border-b border-surface-variant pb-2">
-            <h3 class="font-label-tactical text-[11px] text-outline font-bold uppercase">배터리 시스템 (BMS)</h3>
-            <span id="diag-bms-status-badge" class="px-2 py-0.5 rounded text-[9px] font-label-tactical font-bold bg-success/20 text-success">정상 작동중</span>
-          </div>
-          <div class="flex items-end justify-between">
-            <span class="font-telemetry-display text-4xl text-primary-container font-bold" id="diag-soc">88%</span>
-            <span class="font-label-tactical text-[11px] text-success bg-success/10 px-2 py-0.5 rounded" id="diag-volt-cell">셀 전압 균등 정상</span>
-          </div>
-          <div class="w-full bg-surface-container-highest rounded-full h-2.5 mt-1">
-            <div id="diag-soc-bar" class="bg-gradient-to-r from-primary-container to-surface-tint h-2.5 rounded-full shadow-[0_0_8px_rgba(0,240,255,0.6)]" style="width: 88%"></div>
-          </div>
-          <div class="grid grid-cols-2 gap-2 mt-2 font-label-tactical text-[11px]">
-            <div class="bg-surface-container-high p-2 rounded"><span class="text-outline block">팩 전압</span><span class="text-on-surface font-bold" id="diag-volt">650V</span></div>
-            <div class="bg-surface-container-high p-2 rounded"><span class="text-outline block">모듈 온도</span><span class="text-on-surface font-bold" id="diag-temp">31°C</span></div>
-            <div class="bg-surface-container-high p-2 rounded"><span class="text-outline block">수명 (SOH)</span><span class="text-on-surface font-bold" id="diag-soh">99%</span></div>
-            <div class="bg-surface-container-high p-2 rounded"><span class="text-outline block">완충 주행가능</span><span class="text-on-surface font-bold" id="diag-range">240 km</span></div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        
+        <!-- 좌측: 전체 차량 목록 -->
+        <div class="lg:col-span-1 bg-surface-container rounded-xl border border-surface-variant/50 p-3 flex flex-col gap-2 lg:max-h-[500px]">
+          <h3 class="font-label-tactical text-[11px] text-outline font-bold uppercase border-b border-surface-variant pb-2">전체 관제 차량 (클릭하여 진단)</h3>
+          <div id="diag-all-vehicles-list" class="flex flex-col gap-1.5 overflow-y-auto pr-1 pb-2">
+             <!-- Rendered dynamically -->
           </div>
         </div>
+        
+        <!-- 우측: 선택된 차량 상세 진단 -->
+        <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Battery Status -->
+          <div class="bg-surface-container rounded-xl p-4 border border-surface-variant/50 flex flex-col gap-3 shadow-md relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-3 opacity-20"><span class="material-symbols-outlined text-[60px] text-primary-container">battery_charging_full</span></div>
+            <h3 class="font-label-tactical text-[11px] text-outline font-bold uppercase border-b border-surface-variant pb-2 relative z-10 flex justify-between">
+              배터리 시스템 (BMS)
+              <span id="diag-veh-id" class="text-primary-container">선택됨: --</span>
+            </h3>
+            
+            <div class="flex items-end justify-between relative z-10 mt-2">
+              <span class="font-telemetry-display text-4xl text-primary-container font-bold" id="diag-soc">--%</span>
+              <span class="font-label-tactical text-[11px] text-success bg-success/10 px-2 py-0.5 rounded border border-success/30" id="diag-soc-status">분석중</span>
+            </div>
+            
+            <div class="w-full bg-surface-container-highest rounded-full h-2.5 mt-1 relative z-10">
+              <div id="diag-soc-bar" class="bg-gradient-to-r from-primary-container to-surface-tint h-2.5 rounded-full shadow-[0_0_8px_rgba(0,240,255,0.6)] transition-all duration-500" style="width: 0%"></div>
+            </div>
 
-        <!-- Chassis Wear & Issue Diagnostics Card -->
-        <div class="bg-surface-container rounded-xl p-4 border border-surface-variant/50 flex flex-col gap-3">
-          <div class="flex justify-between items-center border-b border-surface-variant pb-2">
-            <h3 class="font-label-tactical text-[11px] text-outline font-bold uppercase">부품 마모도 및 결함 진단 소견</h3>
-            <span id="diag-issue-count-badge" class="px-2 py-0.5 rounded text-[9px] font-label-tactical font-bold bg-success/20 text-success">결함 없음</span>
+            <div class="grid grid-cols-2 gap-2 mt-4 font-label-tactical text-[11px] relative z-10">
+              <div class="bg-surface-container-high p-2.5 rounded border border-surface-variant/60"><span class="text-outline block mb-0.5">전압 (Voltage)</span><span class="text-on-surface font-bold text-sm" id="diag-volt">--V</span></div>
+              <div class="bg-surface-container-high p-2.5 rounded border border-surface-variant/60"><span class="text-outline block mb-0.5">셀 온도 (Temp)</span><span class="text-on-surface font-bold text-sm" id="diag-temp">--°C</span></div>
+              <div class="bg-surface-container-high p-2.5 rounded border border-surface-variant/60"><span class="text-outline block mb-0.5">건강도 (SOH)</span><span class="text-on-surface font-bold text-sm" id="diag-soh">--%</span></div>
+              <div class="bg-surface-container-high p-2.5 rounded border border-surface-variant/60"><span class="text-outline block mb-0.5">스왑 횟수</span><span class="text-on-surface font-bold text-sm" id="diag-swap">--회</span></div>
+            </div>
           </div>
-          <div id="wear-bars-container" class="flex flex-col gap-3 mt-1">
-            <!-- Dynamically populated -->
+
+          <!-- Component Wear -->
+          <div class="bg-surface-container rounded-xl p-4 border border-surface-variant/50 flex flex-col gap-3 shadow-md relative">
+            <h3 class="font-label-tactical text-[11px] text-outline font-bold uppercase border-b border-surface-variant pb-2 flex justify-between">
+              주요 구동계 마모도
+              <button class="text-[9px] bg-error/20 text-error px-1.5 py-0.5 rounded font-bold border border-error/30 hover:bg-error/30 transition-colors">강제 리부트</button>
+            </h3>
+            <div id="wear-bars-container" class="flex flex-col gap-3 mt-2 flex-1 justify-center">
+              <!-- Dynamically populated -->
+            </div>
           </div>
-          <div id="diag-issue-box" class="mt-2 p-2.5 rounded-lg bg-surface-container-high border border-success/30 text-[11px] font-label-tactical text-success flex items-center gap-2">
-            <span class="material-symbols-outlined text-[16px]">check_circle</span>
-            <span id="diag-issue-text">모든 구동 샤시 및 센서 모듈이 정상 범위 내에 있습니다.</span>
+        </div>
+      </div>
+    </div>
+
+    
+    <!-- 3D Cargo Viewer Modal -->
+    <div id="cargo-3d-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-margin hidden">
+      <div class="bg-surface-container border border-primary-container/50 rounded-2xl w-full max-w-3xl overflow-hidden shadow-[0_0_30px_rgba(0,240,255,0.2)] flex flex-col">
+        <div class="flex items-center justify-between p-3 border-b border-surface-variant/60 bg-surface-container-high">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary-container">view_in_ar</span>
+            <div>
+              <h3 class="font-headline-sm font-bold" id="cargo-modal-title">적재물 3D 뷰어</h3>
+              <p class="font-label-tactical text-[10px] text-outline">화물 유형: <span id="cargo-modal-veh" class="text-secondary font-bold"></span></p>
+            </div>
           </div>
+          <button onclick="closeCargoModal()" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-variant flex items-center justify-center border border-outline/30 transition-colors"><span class="material-symbols-outlined text-[18px]">close</span></button>
+        </div>
+        <div class="relative w-full h-[400px] sm:h-[500px] bg-[#05070c]" id="cargo-3d-container">
+          <!-- Three.js Canvas injected here -->
+          <div class="absolute bottom-3 left-3 bg-black/60 px-2 py-1 rounded text-[10px] font-label-tactical border border-surface-variant text-outline pointer-events-none">마우스 드래그: 회전 | 스크롤: 줌</div>
         </div>
       </div>
     </div>
@@ -404,24 +429,24 @@
           <div class="flex items-center gap-2">
             <span class="material-symbols-outlined text-primary-container text-[24px]">sensor_door</span>
             <div>
-              <h3 class="font-headline-sm text-body-md font-bold text-on-surface" id="modal-gate-title">물류센터 게이트</h3>
-              <span class="font-label-tactical text-[10px] text-outline" id="modal-gate-location">위치 정보</span>
+              <h3 class="font-headline-sm text-body-md font-bold text-on-surface" id="modal-gate-title">GATE-01</h3>
+              <span class="font-label-tactical text-[10px] text-outline" id="modal-gate-location">위치</span>
             </div>
           </div>
-          <button onclick="closeGateInfoModal()" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline"><span class="material-symbols-outlined text-[18px]">close</span></button>
+          <button onclick="closeGateInfoModal()" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline transition-colors"><span class="material-symbols-outlined text-[18px]">close</span></button>
         </div>
         <div class="space-y-2 text-[11px] font-label-tactical">
-          <div class="bg-surface-container p-2.5 rounded-lg flex justify-between"><span class="text-outline">차단기 연동:</span><span class="text-success font-bold">V2I 자동 개방 (Auto)</span></div>
-          <div class="bg-surface-container p-2.5 rounded-lg flex justify-between"><span class="text-outline">최근 통과 차량:</span><span class="text-on-surface font-bold" id="modal-gate-last-veh">포터 EV (#PR-01)</span></div>
+          <div class="bg-surface-container p-2.5 rounded-lg flex justify-between border border-surface-variant/40"><span class="text-outline">차단기 연동 상태:</span><span class="text-success font-bold">자동 개방 (Auto)</span></div>
+          <div class="bg-surface-container p-2.5 rounded-lg flex justify-between border border-surface-variant/40"><span class="text-outline">최근 통과 차량:</span><span class="text-on-surface font-bold" id="modal-gate-last-veh">확인중</span></div>
         </div>
-        <button onclick="closeGateInfoModal()" class="w-full py-2.5 bg-primary-container text-black font-bold rounded-xl text-[12px] active:scale-95 transition-all mt-1">확인</button>
+        <button onclick="closeGateInfoModal()" class="w-full py-2.5 bg-primary-container text-black font-bold rounded-xl text-[12px] active:scale-95 transition-transform mt-1">확인</button>
       </div>
     </div>
 
     <!-- Toast Notification -->
     <div class="fixed top-16 inset-x-4 sm:inset-x-auto sm:right-6 z-50 transform -translate-y-24 opacity-0 transition-all duration-300 pointer-events-none" id="tactical-toast">
       <div class="bg-surface-container-highest text-on-surface px-space-md py-2.5 rounded-xl shadow-2xl border border-primary-container/40 flex items-center gap-2.5">
-        <span class="material-symbols-outlined text-primary-container text-[22px]">check_circle</span>
+        <span class="material-symbols-outlined text-primary-container text-[22px]">info</span>
         <div class="flex flex-col">
           <span class="font-label-tactical text-[9px] text-primary-container font-bold uppercase" id="toast-tag">알림</span>
           <span class="font-body-sm text-[12px] text-on-surface" id="toast-msg">메시지</span>
@@ -429,31 +454,31 @@
       </div>
     </div>
 
-    <!-- Emergency Stop Modal -->
+    <!-- E-Stop Modal -->
     <div class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-margin hidden" id="e-stop-modal">
       <div class="bg-surface-container-lowest border-2 border-error rounded-2xl p-space-md max-w-md w-full shadow-[0_0_50px_rgba(255,77,77,0.8)] flex flex-col gap-3 text-center">
         <div class="w-14 h-14 rounded-full bg-error/20 border-2 border-error text-error flex items-center justify-center mx-auto animate-bounce"><span class="material-symbols-outlined text-[32px]">crisis_alert</span></div>
         <div>
           <h3 class="font-headline-lg text-headline-sm text-error font-extrabold">긴급 비상 정지 발령</h3>
-          <p class="font-body-md text-[12px] text-on-surface-variant mt-1">선택된 상용 차량에 Fail-Safe 즉시 제동 신호를 송출합니다.</p>
+          <p class="font-body-md text-[12px] text-on-surface-variant mt-1">네트워크 내 모든 활성 차량에 Fail-Safe 하드웨어 강제 제동을 실행합니다.</p>
         </div>
         <div class="flex gap-2 pt-2">
-          <button onclick="confirmEmergencyStop()" class="flex-1 py-3 bg-error text-white font-headline-sm text-[13px] rounded-xl font-bold active:scale-95 shadow-lg">즉시 제동 실행</button>
-          <button onclick="closeEmergencyModal()" class="px-4 py-3 bg-surface-container text-on-surface rounded-xl font-label-tactical text-[11px]">취소</button>
+          <button onclick="confirmEmergencyStop()" class="flex-1 py-3 bg-error text-white font-headline-sm text-[13px] rounded-xl font-bold active:scale-95 shadow-lg transition-transform">제동 실행</button>
+          <button onclick="closeEmergencyModal()" class="px-4 py-3 bg-surface-container text-on-surface rounded-xl font-label-tactical text-[11px] hover:bg-surface-variant transition-colors">취소</button>
         </div>
       </div>
     </div>
   </main>
 
-  <nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl border-t border-surface-variant/40 shadow-[0_-2px_16px_rgba(0,0,0,0.6)]">
+  <nav class="fixed bottom-0 w-full z-40 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl border-t border-surface-variant/40 shadow-[0_-2px_16px_rgba(0,0,0,0.6)]">
     <div class="flex justify-around items-center h-14 px-space-xs max-w-7xl mx-auto">
       <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3.5rem] h-11 text-primary-container font-bold transition-colors cursor-pointer" onclick="switchPage(1)">
         <span class="material-symbols-outlined text-[18px]">map</span>
         <span class="font-label-tactical text-[9px] text-center leading-none">경로관제</span>
       </button>
       <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3.5rem] h-11 text-on-surface-variant transition-colors cursor-pointer" onclick="switchPage(2)">
-        <span class="material-symbols-outlined text-[18px]">local_shipping</span>
-        <span class="font-label-tactical text-[9px] text-center leading-none">3D차량틀</span>
+        <span class="material-symbols-outlined text-[18px]">360</span>
+        <span class="font-label-tactical text-[9px] text-center leading-none">카메라POV</span>
       </button>
       <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3.5rem] h-11 text-on-surface-variant transition-colors cursor-pointer" onclick="switchPage(3)">
         <span class="material-symbols-outlined text-[18px]">sensor_door</span>
@@ -471,145 +496,148 @@
   </nav>
 
   <script>
+    // State variables
     let currentRegion = 'busan';
-    let currentVehicleId = 'TR-501'; // Default vehicle
-    let currentModelType = 'cargo5t';
+    let currentPovCam = 'front';
+    let currentVehicleId = null;
+    let currentDiagVehId = null; // For page 5
+    
+    // Map variables
     let googleMap = null;
     let fallbackPolyline = null;
     let mapMarkers = [];
 
-    // Three.js variables for 3D vehicle model
-    let threeScene, threeCamera, threeRenderer, truckGroup;
-    let isDragging3D = false;
-    let previousMousePosition = { x: 0, y: 0 };
-    let cameraAngleMode = 'front';
-    let simulationSpeed = 45;
+    // Three.js variables
+    let tScene, tCamera, tRenderer, tControls;
+    let cargoGroup;
+    let is3DInitialized = false;
 
-    // --- 9 Commercial Vehicles Database (3 per region: Busan, Incheon, Seoul) ---
-    const fleetDatabase = {
-      // --- Busan Region (3 Units: 2 heavy 5T trucks, 1 Porter EV) ---
-      'TR-501': {
-        id: 'TR-501', type: '5톤 윙바디 트럭', region: 'busan', status: '고속도로 주행', statusColor: 'primary-container',
-        speed: '72 km/h', lat: 35.200, lng: 129.045,
-        battery: { soc: 82, voltage: '680V', health: '98%', range: '380 km', bmsStatus: '정상 작동중' },
-        wear: { brake: 18, tire: 24, motor: 12, suspension: 15 },
-        issue: { hasIssue: false, title: '정상 작동', desc: '모든 구동 샤시 및 BMS 센서 모듈이 정상 범위 내에 있습니다.' },
-        cargo: '일반 공산품 (4.5톤)', routeDesc: '부산항 ➔ 양산 물류센터', gear: 'D', steer: 0
-      },
-      'TR-502': {
-        id: 'TR-502', type: '5톤 카고 트럭', region: 'busan', status: '항만 대기중', statusColor: 'secondary',
-        speed: '0 km/h', lat: 35.105, lng: 129.032,
-        battery: { soc: 94, voltage: '680V', health: '99%', range: '410 km', bmsStatus: '정상 작동중' },
-        wear: { brake: 10, tire: 15, motor: 5, suspension: 8 },
-        issue: { hasIssue: false, title: '정상 작동', desc: '차량 계통 대기 모드 정상.' },
-        cargo: '철강 자재 (5.0톤)', routeDesc: '부산항 야적장 대기', gear: 'P', steer: 0
-      },
-      'PR-03': {
-        id: 'PR-03', type: '현대 포터 II EV 탑차', region: 'busan', status: '항만 물류배송', statusColor: 'primary-container',
-        speed: '48 km/h', lat: 35.150, lng: 129.055,
-        battery: { soc: 42, voltage: '345V', health: '89%', range: '110 km', bmsStatus: '배터리 온도 주의' },
-        wear: { brake: 45, tire: 58, motor: 32, suspension: 40 },
-        issue: { hasIssue: true, title: '타이어 트레드 마모 및 배터리 온도 주의', desc: '타이어 마모도 58% 초과로 정비 권장. 배터리 셀 고속 충전 중 승온 감지.' },
-        cargo: '수출입 소형 부품', routeDesc: '부산항 ➔ 부두간 순환', gear: 'D', steer: 5
-      },
-
-      // --- Incheon Region (3 Units: 1 heavy truck, 2 Porter EVs) ---
-      'PR-01': {
-        id: 'PR-01', type: '현대 포터 II EV 탑차', region: 'incheon', status: '도심 배송중', statusColor: 'primary-container',
-        speed: '42 km/h', lat: 37.470, lng: 126.720,
-        battery: { soc: 76, voltage: '350V', health: '97%', range: '190 km', bmsStatus: '정상 작동중' },
-        wear: { brake: 28, tire: 35, motor: 20, suspension: 22 },
-        issue: { hasIssue: false, title: '정상 작동', desc: '도심 자율주행 모듈 정상 작동 중.' },
-        cargo: '택배 소포 120건', routeDesc: '인천 ➔ 부천 물류단지', gear: 'D', steer: 0
-      },
-      'PR-04': {
-        id: 'PR-04', type: '현대 포터 윙바디 택배차', region: 'incheon', status: '허브 입고중', statusColor: 'secondary',
-        speed: '15 km/h', lat: 37.490, lng: 126.740,
-        battery: { soc: 31, voltage: '330V', health: '85%', range: '85 km', bmsStatus: '저전압 경고' },
-        wear: { brake: 62, tire: 55, motor: 48, suspension: 50 },
-        issue: { hasIssue: true, title: '브레이크 패드 과다 마모 & 잔여 배터리 부족', desc: '브레이크 패드 마모율 62%. 즉시 정비소 입고 필요.' },
-        cargo: '대형 가전 부품', routeDesc: '인천항 ➔ 부천 물류센터', gear: 'D', steer: -10
-      },
-      'TR-503': {
-        id: 'TR-503', type: '5톤 컨테이너 운송트럭', region: 'incheon', status: '고속도로 주행', statusColor: 'primary-container',
-        speed: '80 km/h', lat: 37.510, lng: 126.780,
-        battery: { soc: 88, voltage: '680V', health: '99%', range: '390 km', bmsStatus: '정상 작동중' },
-        wear: { brake: 14, tire: 18, motor: 10, suspension: 12 },
-        issue: { hasIssue: false, title: '정상 작동', desc: '항만 고속화도로 V2X 통신 양호.' },
-        cargo: '컨테이너 박스', routeDesc: '인천신항 ➔ 수도권 물류센터', gear: 'D', steer: 0
-      },
-
-      // --- Seoul Region (3 Units: 3 Porter EVs) ---
-      'PR-02': {
-        id: 'PR-02', type: '현대 포터 냉동탑차', region: 'seoul', status: '신선식품 배송', statusColor: 'primary-container',
-        speed: '28 km/h', lat: 37.513, lng: 127.028,
-        battery: { soc: 64, voltage: '350V', health: '95%', range: '150 km', bmsStatus: '정상 작동중' },
-        wear: { brake: 32, tire: 40, motor: 25, suspension: 30 },
-        issue: { hasIssue: false, title: '정상 작동', desc: '냉동탑 콤프레샤 정상 가동 중.' },
-        cargo: '신선 식자재 (냉장)', routeDesc: '서울 강남 도심 순환', gear: 'D', steer: 0
-      },
-      'PR-05': {
-        id: 'PR-05', type: '현대 포터 II EV 탑차', region: 'seoul', status: '오피스 배송중', statusColor: 'primary-container',
-        speed: '35 km/h', lat: 37.502, lng: 127.039,
-        battery: { soc: 58, voltage: '345V', health: '92%', range: '135 km', bmsStatus: '정상 작동중' },
-        wear: { brake: 38, tire: 42, motor: 28, suspension: 35 },
-        issue: { hasIssue: false, title: '정상 작동', desc: '도심 회생제동 효율 최적화됨.' },
-        cargo: '오피스 문서 및 소포', routeDesc: '테헤란로 일대 순환 배송', gear: 'D', steer: 2
-      },
-      'PR-06': {
-        id: 'PR-06', type: '현대 포터 옴니버스 탑차', region: 'seoul', status: '정비 대기중', statusColor: 'error',
-        speed: '0 km/h', lat: 37.520, lng: 127.010,
-        battery: { soc: 19, voltage: '310V', health: '78%', range: '45 km', bmsStatus: '셀 전압 불균형 경고' },
-        wear: { brake: 75, tire: 70, motor: 60, suspension: 68 },
-        issue: { hasIssue: true, title: '배터리 셀 전압 불균형 및 서스펜션 노후화', desc: '배터리 팩 SOH 78% 및 서스펜션 교체 시기 도래. 긴급 점검 필요.' },
-        cargo: '긴급 의료 물품', routeDesc: '강남구 ➔ 서초구 의료원', gear: 'P', steer: 0
-      }
-    };
-
-    const dispatchOrders = [
-      { id: 'ORD-2026-901', route: '부산항 ➔ 양산 물류센터', cargo: '5톤 윙바디 컨테이너', veh: 'TR-501 (5톤)', status: '고속도로 주행', color: 'primary-container' },
-      { id: 'ORD-2026-902', route: '부산항 야적장 대기', cargo: '철강 자재 (5.0톤)', veh: 'TR-502 (5톤)', status: '항만 대기중', color: 'secondary' },
-      { id: 'ORD-2026-903', route: '부산항 ➔ 부두 순환', cargo: '수출입 소형 부품', veh: 'PR-03 (포터)', status: '항만 물류배송', color: 'primary-container' },
-      { id: 'ORD-2026-904', route: '인천 ➔ 부천 물류단지', cargo: '택배 소포 120건', veh: 'PR-01 (포터)', status: '도심 배송중', color: 'primary-container' },
-      { id: 'ORD-2026-905', route: '인천항 ➔ 부천 물류센터', cargo: '대형 가전 부품', veh: 'PR-04 (포터)', status: '허브 입고중', color: 'secondary' },
-      { id: 'ORD-2026-906', route: '인천신항 ➔ 수도권 물류', cargo: '컨테이너 박스', veh: 'TR-503 (5톤)', status: '고속도로 주행', color: 'primary-container' },
-      { id: 'ORD-2026-907', route: '서울 강남 도심 순환', cargo: '신선 식자재 (냉장)', veh: 'PR-02 (포터)', status: '신선식품 배송', color: 'primary-container' },
-      { id: 'ORD-2026-908', route: '테헤란로 일대 순환', cargo: '오피스 문서 및 소포', veh: 'PR-05 (포터)', status: '오피스 배송중', color: 'primary-container' },
-      { id: 'ORD-2026-909', route: '강남구 ➔ 서초구 의료원', cargo: '긴급 의료 물품', veh: 'PR-06 (포터)', status: '정비 대기중', color: 'error' }
-    ];
-
+    // Regional configuration
     const regionsData = {
       'busan': {
-        title: '부산 권역 물류 관제 (3대: TR-501, TR-502, PR-03)',
+        title: '부산항 ➔ 양산 물류허브',
         origin: { lat: 35.1017, lng: 129.0300 },
         destination: { lat: 35.3353, lng: 129.0200 },
         bounds: { north: 35.3500, south: 35.0800, east: 129.1000, west: 128.9800 },
         gates: [
-          { id: 'BG-01', name: '부산항 5부두 5톤 전용 게이트', lat: 35.105, lng: 129.035 },
-          { id: 'BG-02', name: '양산 IC 화물터미널 V2I 게이트', lat: 35.330, lng: 129.025 }
+          { id: 'BG-01', name: '항만 3부두 출구', lat: 35.105, lng: 129.035, status: '정상 개방' },
+          { id: 'BG-02', name: '고속도로 톨게이트', lat: 35.210, lng: 129.050, status: '정상 개방' },
+          { id: 'BG-03', name: '물류센터 메인게이트', lat: 35.330, lng: 129.025, status: '대기중' }
         ]
       },
       'incheon': {
-        title: '인천 권역 물류 관제 (3대: PR-01, PR-04, TR-503)',
-        origin: { lat: 37.4560, lng: 126.7050 },
-        destination: { lat: 37.5030, lng: 126.7660 },
-        bounds: { north: 37.5300, south: 37.4300, east: 126.8000, west: 126.6500 },
+        title: '인천신항 ➔ 부천 물류단지',
+        origin: { lat: 37.3450, lng: 126.6350 },
+        destination: { lat: 37.5200, lng: 126.7800 },
+        bounds: { north: 37.5400, south: 37.3200, east: 126.8000, west: 126.6000 },
         gates: [
-          { id: 'IG-01', name: '인천 도심물류센터 출구', lat: 37.460, lng: 126.710 },
-          { id: 'IG-02', name: '부천 스마트물류게이트', lat: 37.500, lng: 126.760 }
+          { id: 'IG-01', name: '인천신항 터미널 게이트', lat: 37.350, lng: 126.640, status: '정상 개방' },
+          { id: 'IG-02', name: '부천 진입로 게이트', lat: 37.510, lng: 126.775, status: '대기중' }
         ]
       },
-      'seoul': {
-        title: '서울 강남 권역 물류 관제 (3대: PR-02, PR-05, PR-06)',
-        origin: { lat: 37.5133, lng: 127.0286 },
-        destination: { lat: 37.5012, lng: 127.0396 },
-        bounds: { north: 37.5300, south: 37.4900, east: 127.0600, west: 127.0100 },
+      'pyeongtaek': {
+        title: '평택항 ➔ 오산 물류센터',
+        origin: { lat: 36.9550, lng: 126.8450 },
+        destination: { lat: 37.1500, lng: 127.0500 },
+        bounds: { north: 37.1700, south: 36.9300, east: 127.0800, west: 126.8200 },
         gates: [
-          { id: 'SG-01', name: '강남 물류허브 무인게이트', lat: 37.510, lng: 127.030 },
-          { id: 'SG-02', name: '테헤란로 스마트 V2I 게이트', lat: 37.505, lng: 127.035 }
+          { id: 'PG-01', name: '평택항 컨테이너 출구', lat: 36.960, lng: 126.850, status: '정상 개방' },
+          { id: 'PG-02', name: '오산 IC 요금소', lat: 37.140, lng: 127.040, status: '정상 개방' }
         ]
       }
     };
+
+    const fleetDatabase = {
+      // BUSAN
+      'FL-01': { 
+        id: 'FL-01', region: 'busan', status: '고속도로 주행', statusColor: 'primary-container', speed: '68 km/h', lat: 35.200, lng: 129.045, 
+        battery: { soc: 78, voltage: '710V', health: '96%', swapCycles: 142 }, wear: { brake: 24, tire: 32, motor: 18, suspension: 25 }, 
+        cargo: 'EV Battery Cells', routeDesc: '부산항 ➔ 양산 센터', gear: 'D', steer: 0,
+        cargo3D: [
+          {type: 'box', size: [1.2, 1, 1.5], pos: [-0.8, 0.5, -2], color: '#00f0ff'},
+          {type: 'box', size: [1.2, 1, 1.5], pos: [0.8, 0.5, -2], color: '#00f0ff'},
+          {type: 'box', size: [1.2, 1, 1.5], pos: [-0.8, 0.5, 0], color: '#00f0ff'},
+          {type: 'box', size: [1.2, 1, 1.5], pos: [0.8, 0.5, 0], color: '#00f0ff'}
+        ],
+        cams: { front: 'https://images.unsplash.com/photo-1520106212299-d99c443e4568?auto=format&fit=crop&w=1200&q=80', surround: 'https://images.unsplash.com/photo-1551061988-c70e7e172a81?auto=format&fit=crop&w=1200&q=80', cargo: 'https://images.unsplash.com/photo-1506509930773-952de3501099?auto=format&fit=crop&w=1200&q=80', side: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0be2?auto=format&fit=crop&w=1200&q=80' }
+      },
+      'FL-02': { 
+        id: 'FL-02', region: 'busan', status: '항만 대기', statusColor: 'outline', speed: '0 km/h', lat: 35.105, lng: 129.035, 
+        battery: { soc: 99, voltage: '715V', health: '99%', swapCycles: 10 }, wear: { brake: 5, tire: 8, motor: 2, suspension: 5 }, 
+        cargo: 'Wafer Equipment', routeDesc: '부산항 대기장', gear: 'P', steer: 0,
+        cargo3D: [ {type: 'box', size: [2.5, 2, 4], pos: [0, 1, 0], color: '#ffb868'} ],
+        cams: { front: 'https://images.unsplash.com/photo-1600868843510-184ecda67b2e?auto=format&fit=crop&w=1200&q=80', surround: 'https://images.unsplash.com/photo-1518991669955-9c7e78ec80ca?auto=format&fit=crop&w=1200&q=80', cargo: 'https://images.unsplash.com/photo-1580252516483-3c9597282b08?auto=format&fit=crop&w=1200&q=80', side: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80' }
+      },
+      'FL-03': { 
+        id: 'FL-03', region: 'busan', status: '도심 진입', statusColor: 'primary-container', speed: '45 km/h', lat: 35.300, lng: 129.025, 
+        battery: { soc: 65, voltage: '700V', health: '92%', swapCycles: 210 }, wear: { brake: 45, tire: 30, motor: 22, suspension: 28 }, 
+        cargo: 'Consumer Goods', routeDesc: '양산 IC 부근', gear: 'D', steer: -10,
+        cargo3D: [
+          {type: 'box', size: [1, 1, 1], pos: [-1, 0.5, -3], color: '#a2b4c7'}, {type: 'box', size: [1, 1, 1], pos: [0, 0.5, -3], color: '#a2b4c7'}, {type: 'box', size: [1, 1, 1], pos: [1, 0.5, -3], color: '#a2b4c7'},
+          {type: 'box', size: [1, 1, 1], pos: [-1, 0.5, -1.8], color: '#a2b4c7'}, {type: 'box', size: [1, 1, 1], pos: [0, 0.5, -1.8], color: '#a2b4c7'}, {type: 'box', size: [1, 1, 1], pos: [1, 0.5, -1.8], color: '#a2b4c7'}
+        ],
+        cams: { front: 'https://images.unsplash.com/photo-1520106212299-d99c443e4568?auto=format&fit=crop&w=1200&q=80', surround: 'https://images.unsplash.com/photo-1551061988-c70e7e172a81?auto=format&fit=crop&w=1200&q=80', cargo: 'https://images.unsplash.com/photo-1506509930773-952de3501099?auto=format&fit=crop&w=1200&q=80', side: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0be2?auto=format&fit=crop&w=1200&q=80' }
+      },
+      // INCHEON
+      'FL-11': { 
+        id: 'FL-11', region: 'incheon', status: '자율운송', statusColor: 'primary-container', speed: '55 km/h', lat: 37.400, lng: 126.700, 
+        battery: { soc: 82, voltage: '710V', health: '98%', swapCycles: 40 }, wear: { brake: 12, tire: 18, motor: 8, suspension: 10 }, 
+        cargo: 'Semiconductors', routeDesc: '인천신항 ➔ 부천 허브', gear: 'D', steer: 0,
+        cargo3D: [
+          {type: 'cylinder', size: [0.6, 2], pos: [-0.8, 1, -2], color: '#26e07f'}, {type: 'cylinder', size: [0.6, 2], pos: [0.8, 1, -2], color: '#26e07f'},
+          {type: 'cylinder', size: [0.6, 2], pos: [-0.8, 1, 0], color: '#26e07f'}, {type: 'cylinder', size: [0.6, 2], pos: [0.8, 1, 0], color: '#26e07f'}
+        ], 
+        cams: { front: 'https://images.unsplash.com/photo-1600868843510-184ecda67b2e?auto=format&fit=crop&w=1200&q=80', surround: 'https://images.unsplash.com/photo-1518991669955-9c7e78ec80ca?auto=format&fit=crop&w=1200&q=80', cargo: 'https://images.unsplash.com/photo-1580252516483-3c9597282b08?auto=format&fit=crop&w=1200&q=80', side: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80' }
+      },
+      'FL-12': { 
+        id: 'FL-12', region: 'incheon', status: '물류지 하차중', statusColor: 'secondary', speed: '0 km/h', lat: 37.515, lng: 126.775, 
+        battery: { soc: 45, voltage: '690V', health: '90%', swapCycles: 280 }, wear: { brake: 50, tire: 45, motor: 30, suspension: 35 }, 
+        cargo: 'Electronics', routeDesc: '부천 단지 하차장', gear: 'P', steer: 0,
+        cargo3D: [ {type: 'box', size: [1.5, 1, 1.5], pos: [0, 0.5, 2], color: '#ffb868'} ], 
+        cams: { front: 'https://images.unsplash.com/photo-1520106212299-d99c443e4568?auto=format&fit=crop&w=1200&q=80', surround: 'https://images.unsplash.com/photo-1551061988-c70e7e172a81?auto=format&fit=crop&w=1200&q=80', cargo: 'https://images.unsplash.com/photo-1506509930773-952de3501099?auto=format&fit=crop&w=1200&q=80', side: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0be2?auto=format&fit=crop&w=1200&q=80' }
+      },
+      'FL-13': { 
+        id: 'FL-13', region: 'incheon', status: '고속도로 주행', statusColor: 'primary-container', speed: '72 km/h', lat: 37.380, lng: 126.650, 
+        battery: { soc: 88, voltage: '710V', health: '95%', swapCycles: 110 }, wear: { brake: 22, tire: 20, motor: 15, suspension: 18 }, 
+        cargo: 'Steel Rolls', routeDesc: '인천대교 진입부', gear: 'D', steer: 5,
+        cargo3D: [ {type: 'cylinder-h', size: [1.2, 3], pos: [0, 1.2, -1], color: '#788796'} ], 
+        cams: { front: 'https://images.unsplash.com/photo-1600868843510-184ecda67b2e?auto=format&fit=crop&w=1200&q=80', surround: 'https://images.unsplash.com/photo-1518991669955-9c7e78ec80ca?auto=format&fit=crop&w=1200&q=80', cargo: 'https://images.unsplash.com/photo-1580252516483-3c9597282b08?auto=format&fit=crop&w=1200&q=80', side: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80' }
+      },
+      // PYEONGTAEK
+      'FL-21': { 
+        id: 'FL-21', region: 'pyeongtaek', status: '승인 대기', statusColor: 'outline', speed: '0 km/h', lat: 36.960, lng: 126.850, 
+        battery: { soc: 100, voltage: '720V', health: '100%', swapCycles: 5 }, wear: { brake: 2, tire: 5, motor: 1, suspension: 2 }, 
+        cargo: 'Empty Container', routeDesc: '평택항 출차 대기', gear: 'P', steer: 0,
+        cargo3D: [ {type: 'box', size: [3.8, 2.5, 7.8], pos: [0, 1.25, 0], color: '#282d3c'} ], 
+        cams: { front: 'https://images.unsplash.com/photo-1520106212299-d99c443e4568?auto=format&fit=crop&w=1200&q=80', surround: 'https://images.unsplash.com/photo-1551061988-c70e7e172a81?auto=format&fit=crop&w=1200&q=80', cargo: 'https://images.unsplash.com/photo-1506509930773-952de3501099?auto=format&fit=crop&w=1200&q=80', side: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0be2?auto=format&fit=crop&w=1200&q=80' }
+      },
+      'FL-22': { 
+        id: 'FL-22', region: 'pyeongtaek', status: '도심 주행', statusColor: 'primary-container', speed: '35 km/h', lat: 37.050, lng: 126.950, 
+        battery: { soc: 55, voltage: '695V', health: '88%', swapCycles: 340 }, wear: { brake: 40, tire: 38, motor: 25, suspension: 30 }, 
+        cargo: 'Auto Parts', routeDesc: '국도 39호선', gear: 'D', steer: -15,
+        cargo3D: [ {type: 'box', size: [1.5, 1.2, 1.5], pos: [-0.5, 0.6, -2], color: '#00dbe9'}, {type: 'box', size: [1.5, 1.2, 1.5], pos: [0.5, 0.6, -0.2], color: '#00dbe9'} ], 
+        cams: { front: 'https://images.unsplash.com/photo-1600868843510-184ecda67b2e?auto=format&fit=crop&w=1200&q=80', surround: 'https://images.unsplash.com/photo-1518991669955-9c7e78ec80ca?auto=format&fit=crop&w=1200&q=80', cargo: 'https://images.unsplash.com/photo-1580252516483-3c9597282b08?auto=format&fit=crop&w=1200&q=80', side: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80' }
+      },
+      'FL-23': { 
+        id: 'FL-23', region: 'pyeongtaek', status: '게이트 통과', statusColor: 'success', speed: '15 km/h', lat: 37.100, lng: 127.000, 
+        battery: { soc: 72, voltage: '705V', health: '94%', swapCycles: 155 }, wear: { brake: 28, tire: 25, motor: 20, suspension: 22 }, 
+        cargo: 'Frozen Foods', routeDesc: '오산 TG 진입', gear: 'D', steer: 2,
+        cargo3D: [ {type: 'box', size: [3.8, 2.2, 7.5], pos: [0, 1.1, 0], color: '#dfe2f1'} ], 
+        cams: { front: 'https://images.unsplash.com/photo-1520106212299-d99c443e4568?auto=format&fit=crop&w=1200&q=80', surround: 'https://images.unsplash.com/photo-1551061988-c70e7e172a81?auto=format&fit=crop&w=1200&q=80', cargo: 'https://images.unsplash.com/photo-1506509930773-952de3501099?auto=format&fit=crop&w=1200&q=80', side: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0be2?auto=format&fit=crop&w=1200&q=80' }
+      }
+    };
+
+    const dispatchOrders = [
+      { id: 'ORD-2026-0891', route: '부산항 ➔ 양산 허브', cargo: 'EV 배터리 셀', veh: 'FL-01', status: '운송 중', color: 'primary-container' },
+      { id: 'ORD-2026-0892', route: '부산항 ➔ 신항만', cargo: '웨이퍼 장비', veh: 'FL-02', status: '출발 대기', color: 'outline' },
+      { id: 'ORD-2026-0893', route: '양산 ➔ 부산항', cargo: '소비재 팰릿', veh: 'FL-03', status: '도심 진입', color: 'primary-container' },
+      { id: 'ORD-2026-0894', route: '인천신항 ➔ 부천 단지', cargo: '반도체 부품', veh: 'FL-11', status: '운송 중', color: 'primary-container' },
+      { id: 'ORD-2026-0895', route: '부천 ➔ 인천산단', cargo: '가전제품', veh: 'FL-12', status: '하차 중', color: 'secondary' },
+      { id: 'ORD-2026-0896', route: '인천산단 ➔ 평택항', cargo: '철강 코일', veh: 'FL-13', status: '고속주행', color: 'primary-container' },
+      { id: 'ORD-2026-0897', route: '평택항 ➔ 오산 센터', cargo: '공컨테이너', veh: 'FL-21', status: '승인 대기', color: 'outline' },
+      { id: 'ORD-2026-0898', route: '평택항 ➔ 아산 산단', cargo: '자동차 부품', veh: 'FL-22', status: '운송 중', color: 'primary-container' },
+      { id: 'ORD-2026-0899', route: '평택항 ➔ 오산 센터', cargo: '냉동 식품', veh: 'FL-23', status: '게이트통과', color: 'success' }
+    ];
 
     class HTMLMarker extends google.maps.OverlayView {
       constructor(position, html, map) {
@@ -626,17 +654,15 @@
         div.innerHTML = this.html;
         this.div = div;
         const panes = this.getPanes();
-        if (panes && panes.overlayMouseTarget) {
-          panes.overlayMouseTarget.appendChild(div);
-        }
+        if (panes && panes.overlayMouseTarget) panes.overlayMouseTarget.appendChild(div);
       }
       draw() {
         const overlayProjection = this.getProjection();
         if (!overlayProjection || !this.div) return;
         const point = overlayProjection.fromLatLngToDivPixel(this.position);
         if (point) {
-          this.div.style.left = (point.x - 16) + 'px';
-          this.div.style.top = (point.y - 16) + 'px';
+          this.div.style.left = (point.x - 15) + 'px';
+          this.div.style.top = (point.y - 15) + 'px';
         }
       }
       onRemove() {
@@ -647,32 +673,17 @@
       }
     }
 
-    function initMap() {
-      const mapEl = document.getElementById('actual-map');
-      if (!mapEl) return;
-      
-      const darkMapStyle = [
-        { elementType: "geometry", stylers: [{ color: "#141824" }] },
-        { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-        { elementType: "labels.text.fill", stylers: [{ color: "#788796" }] },
-        { elementType: "labels.text.stroke", stylers: [{ color: "#141824" }] },
-        { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#788796" }] },
-        { featureType: "poi", elementType: "geometry", stylers: [{ color: "#282d3c" }] },
-        { featureType: "road", elementType: "geometry", stylers: [{ color: "#282d3c" }] },
-        { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-        { featureType: "water", elementType: "geometry", stylers: [{ color: "#05070c" }] }
-      ];
-
-      googleMap = new google.maps.Map(mapEl, {
-        zoom: 12,
-        center: { lat: 35.1800, lng: 129.0300 },
-        styles: darkMapStyle,
-        disableDefaultUI: true,
-        zoomControl: true
-      });
-
-      changeRegion('busan');
-    }
+    const darkMapStyle = [
+      { "elementType": "geometry", "stylers": [ { "color": "#141824" } ] },
+      { "elementType": "labels.icon", "stylers": [ { "visibility": "off" } ] },
+      { "elementType": "labels.text.fill", "stylers": [ { "color": "#788796" } ] },
+      { "elementType": "labels.text.stroke", "stylers": [ { "color": "#141824" } ] },
+      { "featureType": "administrative", "elementType": "geometry", "stylers": [ { "color": "#788796" } ] },
+      { "featureType": "poi", "elementType": "geometry", "stylers": [ { "color": "#282d3c" } ] },
+      { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#282d3c" } ] },
+      { "featureType": "road", "elementType": "geometry.stroke", "stylers": [ { "color": "#212a37" } ] },
+      { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#05070c" } ] }
+    ];
 
     function changeRegion(regionKey) {
       if (!regionsData[regionKey]) return;
@@ -691,32 +702,21 @@
         }
       });
 
-      if (googleMap && region.bounds) {
-        googleMap.fitBounds(region.bounds);
-      }
-
-      if (fallbackPolyline) {
-        fallbackPolyline.setMap(null);
-      }
+      if (googleMap && region.bounds) googleMap.fitBounds(region.bounds);
+      if (fallbackPolyline) fallbackPolyline.setMap(null);
       
       const lineSymbol = { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 };
       fallbackPolyline = new google.maps.Polyline({
-        path: [region.origin, region.destination],
-        strokeOpacity: 0,
+        path: [region.origin, region.destination], strokeOpacity: 0,
         icons: [{ icon: lineSymbol, offset: '0', repeat: '15px' }],
-        strokeColor: '#00f0ff',
-        strokeWeight: 4,
-        map: googleMap
+        strokeColor: '#00f0ff', strokeWeight: 3, map: googleMap
       });
 
       mapMarkers.forEach(m => m.setMap(null));
       mapMarkers = [];
 
       region.gates.forEach(gate => {
-        const html = `
-          <div onclick="openGateInfoModal('${gate.id}')" class="w-7 h-7 rounded-full bg-surface-container border-2 border-primary-container text-primary-container flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.9)] cursor-pointer hover:scale-125 transition-transform">
-            <span class="w-2 h-2 rounded-full bg-primary-container"></span>
-          </div>`;
+        const html = `<div onclick="openGateInfoModal('${gate.id}')" class="w-6 h-6 rounded-full bg-surface-container border-2 border-primary-container text-primary-container flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.9)] cursor-pointer hover:scale-125 transition-transform"><span class="w-2 h-2 rounded-full bg-primary-container"></span></div>`;
         mapMarkers.push(new HTMLMarker(gate, html, googleMap));
       });
 
@@ -724,23 +724,16 @@
       Object.values(fleetDatabase).forEach(veh => {
         if (veh.region === currentRegion) {
           if (!firstVehId) firstVehId = veh.id;
-          const iconName = 'local_shipping';
-          const badgeBorder = veh.issue.hasIssue ? 'border-error text-error bg-error/10' : 'border-primary-container text-primary-container bg-surface-container';
-          const html = `
-            <div onclick="selectVehicle('${veh.id}')" class="flex flex-col items-center cursor-pointer group">
-              <span class="px-1.5 py-0.5 rounded ${badgeBorder} font-mono text-[9px] font-bold shadow-md whitespace-nowrap mb-0.5">${veh.id}</span>
-              <div class="w-8 h-8 rounded-lg bg-primary-container/20 border-2 ${veh.issue.hasIssue ? 'border-error text-error' : 'border-primary-container text-primary-container'} flex items-center justify-center shadow-[0_0_12px_rgba(0,240,255,0.8)]">
-                <span class="material-symbols-outlined text-[18px]">${iconName}</span>
-              </div>
-            </div>`;
+          const html = `<div onclick="selectVehicle('${veh.id}')" class="flex flex-col items-center cursor-pointer group"><span class="px-1.5 py-0.5 rounded bg-surface-container border border-primary-container text-primary-container font-mono text-[9px] font-bold shadow-md whitespace-nowrap mb-0.5">${veh.id}</span><div class="w-7 h-7 rounded-lg bg-primary-container/20 border-2 border-primary-container flex items-center justify-center text-primary-container shadow-[0_0_12px_rgba(0,240,255,0.8)] hover:scale-110 transition-transform"><span class="material-symbols-outlined text-[16px]">local_shipping</span></div></div>`;
           mapMarkers.push(new HTMLMarker({ lat: veh.lat, lng: veh.lng }, html, googleMap));
         }
       });
 
       updateHeaderVehicleSelect();
-      if (firstVehId) selectVehicle(firstVehId);
+      if(firstVehId) selectVehicle(firstVehId);
       renderFleetCards();
       renderGatesPage();
+      showNotification('REGION LOADED', `${region.title.split(' ')[0]} 도로망 로드 완료.`);
     }
 
     function updateHeaderVehicleSelect() {
@@ -750,68 +743,47 @@
         if (veh.region === currentRegion) {
           const opt = document.createElement('option');
           opt.value = veh.id;
-          opt.className = `bg-surface-container text-on-surface`;
-          opt.textContent = `${veh.id} - ${veh.type} [${veh.status}]`;
+          opt.className = `bg-surface-container text-${veh.statusColor}`;
+          opt.textContent = `${veh.id} [${veh.status}]`;
           selectEl.appendChild(opt);
         }
       });
     }
 
     function selectVehicle(id) {
-      if (!fleetDatabase[id]) return;
+      if(!fleetDatabase[id]) return;
       currentVehicleId = id;
       const d = fleetDatabase[id];
-      const headerSel = document.getElementById('header-vehicle-select');
-      if(headerSel) headerSel.value = id;
+      const selectEl = document.getElementById('header-vehicle-select');
+      if(selectEl && [...selectEl.options].some(o => o.value === id)) selectEl.value = id;
       
-      document.getElementById('teleop-active-id').textContent = `${d.type} (#${d.id})`;
+      document.getElementById('teleop-active-id').textContent = `트럭 #${d.id}`;
       document.getElementById('teleop-active-mode').textContent = d.status;
-      document.getElementById('teleop-active-desc').textContent = `${d.routeDesc} | 적재: ${d.cargo}`;
-
-      // Automatically switch 3D model type
-      if (d.id.startsWith('TR')) {
-        currentModelType = 'cargo5t';
-        document.getElementById('teleop-model-switcher').value = 'cargo5t';
-      } else {
-        currentModelType = 'porter';
-        document.getElementById('teleop-model-switcher').value = 'porter';
-      }
-      rebuild3DTruckModel();
-
-      simulationSpeed = parseInt(d.speed) || 45;
-      document.getElementById('teleop-speed-indicator').textContent = `속도: ${simulationSpeed} km/h`;
-
+      document.getElementById('teleop-active-mode').className = `px-2 py-0.5 rounded font-label-tactical text-[9px] font-bold bg-${d.statusColor}/20 text-${d.statusColor}`;
+      document.getElementById('teleop-active-desc').textContent = d.routeDesc;
+      
+      switchCameraPov(currentPovCam);
       setGear(d.gear, false);
+      
       const steer = document.getElementById('steerSliderInput');
       if(steer) steer.value = d.steer;
       const steerVal = document.getElementById('steerValDisplay');
       if(steerVal) steerVal.textContent = `${d.steer > 0?'+':''}${d.steer}°`;
 
       renderFleetCards();
-      updateDiagnosticsPanel();
-    }
-
-    function switchVehicleModelType(type) {
-      currentModelType = type;
-      rebuild3DTruckModel();
-      const name = type === 'porter' ? '현대 포터 EV (탑차 섀시)' : '현대 5톤 윙바디/카고 트럭 섀시';
-      document.getElementById('canvas-3d-title').textContent = `3D 상용차 프레임 시뮬레이터 (${name})`;
-      showNotification('MODEL SWAPPED', `3D 모델이 ${name}(으)로 전환되었습니다.`);
     }
 
     function renderFleetCards() {
       const c = document.getElementById('fleet-cards-grid');
-      if(!c) return;
       c.innerHTML = Object.values(fleetDatabase).filter(v => v.region === currentRegion).map(d => `
-        <div class="bg-surface-container rounded-xl p-3 border ${d.id === currentVehicleId ? 'border-primary-container shadow-[0_0_12px_rgba(0,240,255,0.4)]' : 'border-surface-variant/50'} flex flex-col gap-2 cursor-pointer hover:border-primary-container/50 transition-colors" onclick="selectVehicle('${d.id}')">
+        <div class="bg-surface-container rounded-xl p-3 border ${d.id === currentVehicleId ? 'border-primary-container shadow-[0_0_10px_rgba(0,240,255,0.3)]' : 'border-surface-variant/50'} flex flex-col gap-2 cursor-pointer hover:border-primary-container/50 transition-colors" onclick="selectVehicle('${d.id}')">
           <div class="flex items-center justify-between">
-            <span class="font-headline-sm font-bold text-primary-container">${d.id} - ${d.type}</span>
+            <span class="font-headline-sm font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px] text-primary-container">local_shipping</span> #${d.id}</span>
             <span class="px-2 py-0.5 rounded text-[9px] font-label-tactical font-bold bg-${d.statusColor}/20 text-${d.statusColor}">${d.status}</span>
           </div>
-          <div class="text-[11px] font-label-tactical text-outline flex justify-between">
-            <span>적재물: ${d.cargo}</span><span>배터리: ${d.battery.soc}%</span>
+          <div class="text-[10px] font-label-tactical text-outline flex justify-between">
+            <span class="truncate pr-2">적재: ${d.cargo}</span><span class="font-bold text-on-surface">BAT: ${d.battery.soc}%</span>
           </div>
-          ${d.issue.hasIssue ? `<div class="text-[10px] text-error font-label-tactical bg-error/10 px-2 py-1 rounded border border-error/30 flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">warning</span>결함 감지: ${d.issue.title}</div>` : ''}
         </div>
       `).join('');
     }
@@ -822,433 +794,319 @@
       const region = regionsData[currentRegion];
       c.innerHTML = region.gates.map(g => `
         <div class="bg-surface-container rounded-xl border border-surface-variant/50 overflow-hidden shadow-md">
-          <div class="h-24 bg-surface-container-highest relative flex items-center justify-center">
-            <span class="material-symbols-outlined text-outline text-4xl opacity-30">videocam</span>
-            <span class="absolute top-2 left-2 bg-black/60 text-primary-container text-[9px] font-label-tactical px-1.5 rounded">V2I GATE CCTV</span>
+          <div class="h-28 bg-surface-container-highest relative flex items-center justify-center">
+            <span class="material-symbols-outlined text-outline text-5xl opacity-20">videocam</span>
+            <span class="absolute top-2 left-2 bg-black/60 text-primary-container text-[9px] font-label-tactical px-1.5 rounded border border-primary-container/30">CCTV LIVE</span>
+            <div class="absolute inset-0 bg-gradient-to-t from-surface-container to-transparent opacity-80"></div>
           </div>
-          <div class="p-3 flex flex-col gap-1">
-            <span class="font-bold text-sm text-primary-container">${g.id}</span>
-            <span class="text-[11px] font-label-tactical text-outline">${g.name}</span>
+          <div class="p-3 flex flex-col gap-1 relative z-10 -mt-6">
+            <span class="font-bold text-sm text-primary-container bg-surface-container-highest px-2 py-0.5 rounded w-max border border-surface-variant">${g.id}</span>
+            <span class="text-[11px] font-label-tactical text-on-surface mt-1">${g.name}</span>
             <div class="mt-2 flex justify-between items-center text-[11px] font-label-tactical border-t border-surface-variant/50 pt-2">
-              <span class="text-outline">통신 프로토콜:</span>
-              <span class="text-success font-bold">WAVE / 5G NR-V2X (2.1ms)</span>
+              <span class="text-outline">상태:</span>
+              <span class="text-success font-bold">${g.status}</span>
             </div>
           </div>
         </div>
       `).join('');
     }
 
-    function renderDispatchTable() {
+    function renderDispatchPage() {
       const tb = document.getElementById('dispatch-table-body');
       if(!tb) return;
       tb.innerHTML = dispatchOrders.map(o => `
-        <tr class="hover:bg-surface-variant/20 transition-colors">
-          <td class="p-3 font-bold text-on-surface">${o.id}</td>
-          <td class="p-3 text-outline">${o.route}</td>
-          <td class="p-3 text-on-surface-variant">${o.cargo}</td>
-          <td class="p-3 text-primary-container font-bold">${o.veh}</td>
-          <td class="p-3"><span class="bg-${o.color}/15 text-${o.color} px-2 py-0.5 rounded font-bold text-[9px]">${o.status}</span></td>
+        <tr class="hover:bg-surface-variant/30 transition-colors cursor-pointer group" onclick="openCargoModal('${o.veh}')">
+          <td class="p-3 font-bold text-on-surface border-b border-surface-variant/20">${o.id}</td>
+          <td class="p-3 text-outline border-b border-surface-variant/20">${o.route}</td>
+          <td class="p-3 border-b border-surface-variant/20">${o.cargo}</td>
+          <td class="p-3 text-primary-container font-bold border-b border-surface-variant/20">${o.veh}</td>
+          <td class="p-3 border-b border-surface-variant/20"><span class="bg-${o.color}/15 text-${o.color} px-2 py-0.5 rounded font-bold text-[9px] border border-${o.color}/20">${o.status}</span></td>
+          <td class="p-3 border-b border-surface-variant/20 text-center">
+            <button class="w-7 h-7 rounded-full bg-surface-container-high group-hover:bg-primary-container group-hover:text-black flex items-center justify-center transition-colors mx-auto text-outline">
+              <span class="material-symbols-outlined text-[16px]">view_in_ar</span>
+            </button>
+          </td>
         </tr>
       `).join('');
     }
 
-    function initDiagnosticsUI() {
-      const dropdown = document.getElementById('diag-vehicle-dropdown');
-      dropdown.innerHTML = '';
-      Object.values(fleetDatabase).forEach(v => {
-        const opt = document.createElement('option');
-        opt.value = v.id;
-        opt.className = 'bg-surface-container text-on-surface';
-        opt.textContent = `${v.id} (${v.type}) - ${v.region.toUpperCase()}권역`;
-        dropdown.appendChild(opt);
-      });
-
-      const quickTabs = document.getElementById('diag-quick-tabs');
-      quickTabs.innerHTML = Object.values(fleetDatabase).map(v => `
-        <button onclick="onDiagnosticsVehicleChange('${v.id}')" id="diag-tab-${v.id}" class="diag-tab-btn p-2 rounded-xl border ${v.id === currentVehicleId ? 'border-primary-container bg-primary-container/10 text-primary-container' : 'border-surface-variant bg-surface-container text-outline'} text-center font-label-tactical text-[10px] font-bold truncate transition-all">
-          ${v.id}
-          ${v.issue.hasIssue ? '<span class="block w-2 h-2 rounded-full bg-error mx-auto mt-1 animate-pulse"></span>' : '<span class="block w-2 h-2 rounded-full bg-success mx-auto mt-1"></span>'}
-        </button>
-      `).join('');
-
-      updateDiagnosticsPanel();
-    }
-
-    function onDiagnosticsVehicleChange(vehId) {
-      currentVehicleId = vehId;
-      document.getElementById('diag-vehicle-dropdown').value = vehId;
+    function renderDiagnosticList() {
+      const listEl = document.getElementById('diag-all-vehicles-list');
+      if(!listEl) return;
       
-      document.querySelectorAll('.diag-tab-btn').forEach(btn => {
-        if(btn.id === `diag-tab-${vehId}`) {
-          btn.className = "diag-tab-btn p-2 rounded-xl border border-primary-container bg-primary-container/10 text-primary-container text-center font-label-tactical text-[10px] font-bold truncate transition-all shadow-md";
-        } else {
-          btn.className = "diag-tab-btn p-2 rounded-xl border border-surface-variant bg-surface-container text-outline text-center font-label-tactical text-[10px] font-bold truncate transition-all";
-        }
-      });
-
-      updateDiagnosticsPanel();
-    }
-
-    function updateDiagnosticsPanel() {
-      const d = fleetDatabase[currentVehicleId];
-      if(!d) return;
-
-      document.getElementById('diag-soc').textContent = d.battery.soc + '%';
-      document.getElementById('diag-soc-bar').style.width = d.battery.soc + '%';
-      document.getElementById('diag-volt').textContent = d.battery.voltage;
-      document.getElementById('diag-volt-cell').textContent = d.battery.bmsStatus;
-      document.getElementById('diag-temp').textContent = d.battery.soc < 35 ? '48°C (승온)' : '31°C';
-      document.getElementById('diag-soh').textContent = d.battery.health;
-      document.getElementById('diag-range').textContent = d.battery.range;
-
-      const bmsBadge = document.getElementById('diag-bms-status-badge');
-      if (d.issue.hasIssue) {
-        bmsBadge.className = "px-2 py-0.5 rounded text-[9px] font-label-tactical font-bold bg-error/20 text-error";
-        bmsBadge.textContent = "점검 필요";
-      } else {
-        bmsBadge.className = "px-2 py-0.5 rounded text-[9px] font-label-tactical font-bold bg-success/20 text-success";
-        bmsBadge.textContent = "정상 작동중";
-      }
-
-      const issueBadge = document.getElementById('diag-issue-count-badge');
-      const issueBox = document.getElementById('diag-issue-box');
-      const issueText = document.getElementById('diag-issue-text');
-
-      if (d.issue.hasIssue) {
-        issueBadge.className = "px-2 py-0.5 rounded text-[9px] font-label-tactical font-bold bg-error/20 text-error";
-        issueBadge.textContent = "결함 발견";
-        issueBox.className = "mt-2 p-2.5 rounded-lg bg-error/10 border border-error/30 text-[11px] font-label-tactical text-error flex items-center gap-2";
-        issueBox.querySelector('span').textContent = 'warning';
-        issueText.textContent = `[${d.issue.title}] ${d.issue.desc}`;
-      } else {
-        issueBadge.className = "px-2 py-0.5 rounded text-[9px] font-label-tactical font-bold bg-success/20 text-success";
-        issueBadge.textContent = "결함 없음";
-        issueBox.className = "mt-2 p-2.5 rounded-lg bg-surface-container-high border border-success/30 text-[11px] font-label-tactical text-success flex items-center gap-2";
-        issueBox.querySelector('span').textContent = 'check_circle';
-        issueText.textContent = '모든 구동 샤시 및 센서 모듈이 정상 범위 내에 있습니다.';
-      }
-
-      const w = d.wear;
-      const wCont = document.getElementById('wear-bars-container');
-      wCont.innerHTML = [
-        { name: '브레이크 패드 마모', val: w.brake },
-        { name: '타이어 트레드 마모', val: w.tire },
-        { name: '구동 모터 효율', val: w.motor },
-        { name: '대형 판스프링 서스펜션', val: w.suspension }
-      ].map(item => `
-        <div>
-          <div class="flex justify-between text-[11px] font-label-tactical mb-1">
-            <span class="text-outline">${item.name}</span>
-            <span class="${item.val > 50 ? 'text-error' : item.val > 30 ? 'text-secondary' : 'text-success'} font-bold">${item.val}%</span>
+      listEl.innerHTML = Object.values(fleetDatabase).map(d => `
+        <div onclick="updateDiagnosticsPanel('${d.id}')" class="p-2.5 rounded-lg border ${currentDiagVehId === d.id ? 'bg-surface-variant/40 border-primary-container' : 'bg-surface-container-high border-surface-variant/40'} flex justify-between items-center cursor-pointer list-hover-fx transition-colors">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px] text-${d.statusColor}">local_shipping</span>
+            <div class="flex flex-col">
+              <span class="font-headline-sm font-bold text-[12px]">${d.id}</span>
+              <span class="text-[9px] font-label-tactical text-outline">${regionsData[d.region].title.split(' ')[0]}</span>
+            </div>
           </div>
-          <div class="w-full bg-surface-container-highest rounded-full h-1.5">
-            <div class="${item.val > 50 ? 'bg-error' : item.val > 30 ? 'bg-secondary' : 'bg-success'} h-1.5 rounded-full" style="width: ${item.val}%"></div>
+          <div class="flex flex-col items-end">
+            <span class="text-[10px] font-label-tactical text-${d.battery.soc < 50 ? 'secondary' : 'success'} font-bold">BAT ${d.battery.soc}%</span>
+            <span class="text-[9px] font-label-tactical text-outline">${d.status}</span>
           </div>
         </div>
       `).join('');
     }
 
-    // --- Three.js 3D Vehicle Simulation Model Setup ---
-    function init3DViewer() {
-      const container = document.getElementById('three-canvas-container');
-      if (!container || threeRenderer) return;
-
-      const width = container.clientWidth;
-      const height = container.clientHeight || 350;
-
-      threeScene = new THREE.Scene();
-      threeScene.background = new THREE.Color(0x05070c);
-
-      threeCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-      threeCamera.position.set(12, 6, 12);
-      threeCamera.lookAt(0, 0, 0);
-
-      threeRenderer = new THREE.WebGLRenderer({ antialias: true });
-      threeRenderer.setSize(width, height);
-      threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      container.appendChild(threeRenderer.domElement);
-
-      // Lights
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-      threeScene.add(ambientLight);
+    function updateDiagnosticsPanel(vehId) {
+      if(!fleetDatabase[vehId]) return;
+      currentDiagVehId = vehId;
+      const d = fleetDatabase[vehId];
       
-      const dirLight = new THREE.DirectionalLight(0x00f0ff, 1.2);
+      renderDiagnosticList(); // Refresh list to update selection styling
+
+      document.getElementById('diag-veh-id').textContent = `선택됨: ${d.id}`;
+      document.getElementById('diag-soc').textContent = d.battery.soc + '%';
+      
+      const bar = document.getElementById('diag-soc-bar');
+      bar.style.width = d.battery.soc + '%';
+      if(d.battery.soc < 30) { bar.className = "bg-gradient-to-r from-error to-error-container h-2.5 rounded-full shadow-[0_0_8px_rgba(255,77,77,0.6)] transition-all duration-500"; }
+      else if(d.battery.soc < 60) { bar.className = "bg-gradient-to-r from-secondary to-orange-600 h-2.5 rounded-full shadow-[0_0_8px_rgba(255,184,104,0.6)] transition-all duration-500"; }
+      else { bar.className = "bg-gradient-to-r from-primary-container to-surface-tint h-2.5 rounded-full shadow-[0_0_8px_rgba(0,240,255,0.6)] transition-all duration-500"; }
+      
+      document.getElementById('diag-soc-status').textContent = d.battery.soc < 30 ? '충전 요망' : '방전율 정상';
+      document.getElementById('diag-soc-status').className = `font-label-tactical text-[11px] px-2 py-0.5 rounded border ${d.battery.soc < 30 ? 'bg-error/10 text-error border-error/30' : 'bg-success/10 text-success border-success/30'}`;
+
+      document.getElementById('diag-volt').textContent = d.battery.voltage;
+      document.getElementById('diag-temp').textContent = (30 + Math.floor(Math.random()*6)) + '°C'; // simulated temp
+      document.getElementById('diag-soh').textContent = d.battery.health;
+      document.getElementById('diag-swap').textContent = d.battery.swapCycles + '회';
+
+      const w = d.wear;
+      const wCont = document.getElementById('wear-bars-container');
+      wCont.innerHTML = [
+        { name: '브레이크 패드', val: w.brake }, { name: '타이어 트레드', val: w.tire },
+        { name: '드라이브 모터', val: w.motor }, { name: '서스펜션 댐퍼', val: w.suspension }
+      ].map(item => `
+        <div>
+          <div class="flex justify-between text-[11px] font-label-tactical mb-1">
+            <span class="text-outline">${item.name} 마모도</span>
+            <span class="${item.val > 40 ? 'text-secondary' : 'text-success'} font-bold">${item.val}%</span>
+          </div>
+          <div class="w-full bg-surface-container-highest rounded-full h-2">
+            <div class="${item.val > 40 ? 'bg-secondary' : 'bg-success'} h-2 rounded-full shadow-sm" style="width: ${item.val}%"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function init3DViewer() {
+      const container = document.getElementById('cargo-3d-container');
+      if (!container || is3DInitialized) return;
+      is3DInitialized = true;
+
+      tScene = new THREE.Scene();
+      tScene.background = new THREE.Color(0x05070c);
+
+      tCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+      tCamera.position.set(6, 4, 8);
+
+      tRenderer = new THREE.WebGLRenderer({ antialias: true });
+      tRenderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(tRenderer.domElement);
+
+      tControls = new THREE.OrbitControls(tCamera, tRenderer.domElement);
+      tControls.enableDamping = true;
+      tControls.maxPolarAngle = Math.PI / 2 + 0.1; // Don't go too far below ground
+
+      // Lighting
+      tScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
       dirLight.position.set(10, 20, 10);
-      threeScene.add(dirLight);
+      tScene.add(dirLight);
 
-      const backLight = new THREE.DirectionalLight(0xffb868, 0.6);
-      backLight.position.set(-10, -10, -10);
-      threeScene.add(backLight);
+      // Truck bed (Floor)
+      const bedGeo = new THREE.BoxGeometry(4.2, 0.2, 8.5);
+      const bedMat = new THREE.MeshPhongMaterial({ color: 0x282d3c });
+      const bed = new THREE.Mesh(bedGeo, bedMat);
+      bed.position.y = -0.1;
+      tScene.add(bed);
+      
+      // Truck bed grid helper
+      const gridHelper = new THREE.GridHelper(10, 10, 0x00dbe9, 0x141824);
+      gridHelper.position.y = 0.01;
+      tScene.add(gridHelper);
 
-      // Grid helper floor
-      const gridHelper = new THREE.GridHelper(30, 30, 0x00f0ff, 0x282d3c);
-      gridHelper.position.y = -1;
-      threeScene.add(gridHelper);
-
-      rebuild3DTruckModel();
-
-      // Mouse interactivity for 3D camera rotation
-      const dom = threeRenderer.domElement;
-      dom.addEventListener('mousedown', (e) => {
-        isDragging3D = true;
-        previousMousePosition = { x: e.clientX, y: e.clientY };
-      });
-      window.addEventListener('mousemove', (e) => {
-        if (!isDragging3D || !truckGroup) return;
-        const deltaX = e.clientX - previousMousePosition.x;
-        truckGroup.rotation.y += deltaX * 0.01;
-        previousMousePosition = { x: e.clientX, y: e.clientY };
-      });
-      window.addEventListener('mouseup', () => { isDragging3D = false; });
-
-      // Touch events for mobile
-      dom.addEventListener('touchstart', (e) => {
-        if(e.touches.length === 1) {
-          isDragging3D = true;
-          previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        }
-      });
-      window.addEventListener('touchmove', (e) => {
-        if (!isDragging3D || !truckGroup || e.touches.length !== 1) return;
-        const deltaX = e.touches[0].clientX - previousMousePosition.x;
-        truckGroup.rotation.y += deltaX * 0.01;
-        previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      });
-      window.addEventListener('touchend', () => { isDragging3D = false; });
+      cargoGroup = new THREE.Group();
+      tScene.add(cargoGroup);
 
       animate3D();
-    }
-
-    function rebuild3DTruckModel() {
-      if (!threeScene) return;
-      if (truckGroup) {
-        threeScene.remove(truckGroup);
-      }
-
-      truckGroup = new THREE.Group();
-
-      if (currentModelType === 'porter') {
-        const cabMat = new THREE.MeshStandardMaterial({ color: 0xeef2f7, roughness: 0.3, metalness: 0.2 });
-        const glassMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.8 });
-        const boxMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5 });
-        const frameMat = new THREE.MeshStandardMaterial({ color: 0x1c2130, roughness: 0.8, metalness: 0.5 });
-        const accentMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 0.5 });
-
-        const cabGeo = new THREE.BoxGeometry(2.0, 1.4, 1.8);
-        const cab = new THREE.Mesh(cabGeo, cabMat);
-        cab.position.set(1.1, 0.4, 0);
-        truckGroup.add(cab);
-
-        const glassGeo = new THREE.BoxGeometry(0.1, 1.0, 1.6);
-        const windshield = new THREE.Mesh(glassGeo, glassMat);
-        windshield.position.set(2.0, 0.6, 0);
-        windshield.rotation.z = -0.35;
-        truckGroup.add(windshield);
-
-        const boxGeo = new THREE.BoxGeometry(3.6, 2.0, 1.9);
-        const cargoBox = new THREE.Mesh(boxGeo, boxMat);
-        cargoBox.position.set(-1.1, 0.7, 0);
-        truckGroup.add(cargoBox);
-
-        const stripeGeo = new THREE.BoxGeometry(3.62, 0.15, 1.92);
-        const stripe = new THREE.Mesh(stripeGeo, accentMat);
-        stripe.position.set(-1.1, 0.5, 0);
-        truckGroup.add(stripe);
-
-        const frameGeo = new THREE.BoxGeometry(5.2, 0.2, 1.4);
-        const frame = new THREE.Mesh(frameGeo, frameMat);
-        frame.position.set(0, -0.3, 0);
-        truckGroup.add(frame);
-
-        createWheelsForTruck(1.5, -1.5, 1.0);
-
-      } else {
-        const cabMat = new THREE.MeshStandardMaterial({ color: 0x00dbe9, roughness: 0.3, metalness: 0.4 });
-        const glassMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.8 });
-        const wingMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.6 });
-        const frameMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
-        const neonMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 0.8 });
-
-        const cabGeo = new THREE.BoxGeometry(2.4, 2.2, 2.4);
-        const cab = new THREE.Mesh(cabGeo, cabMat);
-        cab.position.set(2.2, 0.7, 0);
-        truckGroup.add(cab);
-
-        const glassGeo = new THREE.BoxGeometry(0.1, 1.4, 2.2);
-        const glass = new THREE.Mesh(glassGeo, glassMat);
-        glass.position.set(3.3, 1.0, 0);
-        glass.rotation.z = -0.3;
-        truckGroup.add(glass);
-
-        const wingGeo = new THREE.BoxGeometry(5.8, 2.6, 2.5);
-        const wingBox = new THREE.Mesh(wingGeo, wingMat);
-        wingBox.position.set(-1.0, 1.0, 0);
-        truckGroup.add(wingBox);
-
-        const ledGeo = new THREE.BoxGeometry(5.82, 0.1, 2.52);
-        const led = new THREE.Mesh(ledGeo, neonMat);
-        led.position.set(-1.0, 1.5, 0);
-        truckGroup.add(led);
-
-        const frameGeo = new THREE.BoxGeometry(8.2, 0.3, 2.0);
-        const frame = new THREE.Mesh(frameGeo, frameMat);
-        frame.position.set(0, -0.3, 0);
-        truckGroup.add(frame);
-
-        createWheelsForTruck(2.6, -2.2, 1.2, true);
-      }
-
-      threeScene.add(truckGroup);
-    }
-
-    function createWheelsForTruck(frontX, rearX, zWidth, isHeavy = false) {
-      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
-      const rimMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, metalness: 0.8, roughness: 0.2 });
       
-      const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 24);
-      wheelGeo.rotateX(Math.PI / 2);
-
-      const rimGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.42, 16);
-      rimGeo.rotateX(Math.PI / 2);
-
-      function makeWheel() {
-        const group = new THREE.Group();
-        const tire = new THREE.Mesh(wheelGeo, wheelMat);
-        const rim = new THREE.Mesh(rimGeo, rimMat);
-        group.add(tire);
-        group.add(rim);
-        return group;
-      }
-
-      const fl = makeWheel(); fl.position.set(frontX, -0.5, zWidth); truckGroup.add(fl);
-      const fr = makeWheel(); fr.position.set(frontX, -0.5, -zWidth); truckGroup.add(fr);
-      const rl = makeWheel(); rl.position.set(rearX, -0.5, zWidth); truckGroup.add(rl);
-      const rr = makeWheel(); rr.position.set(rearX, -0.5, -zWidth); truckGroup.add(rr);
-
-      if (isHeavy) {
-        const rlL = makeWheel(); rlL.position.set(rearX - 0.8, -0.5, zWidth); truckGroup.add(rlL);
-        const rrR = makeWheel(); rrR.position.set(rearX - 0.8, -0.5, -zWidth); truckGroup.add(rrR);
-      }
-    }
-
-    function setCameraAngle(mode) {
-      cameraAngleMode = mode;
-      if (!threeCamera) return;
-      if (mode === 'front') {
-        threeCamera.position.set(8, 3, 8);
-      } else if (mode === 'side') {
-        threeCamera.position.set(0, 4, 12);
-      } else if (mode === 'top') {
-        threeCamera.position.set(0, 14, 0.1);
-      }
-      threeCamera.lookAt(0, 0, 0);
-      showNotification('CAMERA', `3D 시점: ${mode.toUpperCase()} 뷰 전환`);
+      // Handle window resize for canvas
+      window.addEventListener('resize', () => {
+        if(document.getElementById('cargo-3d-modal').classList.contains('hidden')) return;
+        tCamera.aspect = container.clientWidth / container.clientHeight;
+        tCamera.updateProjectionMatrix();
+        tRenderer.setSize(container.clientWidth, container.clientHeight);
+      });
     }
 
     function animate3D() {
       requestAnimationFrame(animate3D);
-      if (truckGroup && !isDragging3D) {
-        truckGroup.rotation.y += 0.003;
-      }
-      if (threeRenderer && threeScene && threeCamera) {
-        threeRenderer.render(threeScene, threeCamera);
-      }
+      if (tControls) tControls.update();
+      if (tRenderer && tScene && tCamera) tRenderer.render(tScene, tCamera);
     }
 
-    function onSteerSliderChange(val) {
-      const v = parseInt(val);
-      document.getElementById('steerValDisplay').textContent = `${v > 0?'+':''}${v}°`;
-      if (truckGroup) {
-        truckGroup.rotation.y += (v * 0.001);
+    function openCargoModal(vehId) {
+      if(!fleetDatabase[vehId]) {
+        showNotification('ERROR', '차량 데이터를 찾을 수 없습니다.');
+        return;
       }
+      
+      if(!is3DInitialized) init3DViewer();
+      
+      document.getElementById('cargo-modal-title').textContent = `적재물 3D 뷰어 - ${vehId}`;
+      document.getElementById('cargo-modal-veh').textContent = fleetDatabase[vehId].cargo;
+      document.getElementById('cargo-3d-modal').classList.remove('hidden');
+      
+      // Load specific cargo meshes
+      while(cargoGroup.children.length > 0){ 
+          const child = cargoGroup.children[0];
+          cargoGroup.remove(child); 
+          if(child.geometry) child.geometry.dispose();
+          if(child.material) child.material.dispose();
+      }
+
+      const cData = fleetDatabase[vehId].cargo3D;
+      if(cData && cData.length > 0) {
+        cData.forEach(item => {
+          let geo, mat;
+          if (item.type === 'box') geo = new THREE.BoxGeometry(item.size[0], item.size[1], item.size[2]);
+          else if (item.type === 'cylinder') geo = new THREE.CylinderGeometry(item.size[0], item.size[0], item.size[1], 32);
+          else if (item.type === 'cylinder-h') {
+            geo = new THREE.CylinderGeometry(item.size[0], item.size[0], item.size[1], 32);
+          }
+          
+          mat = new THREE.MeshPhongMaterial({ color: item.color, shininess: 80 });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(item.pos[0], item.pos[1], item.pos[2]);
+          
+          if(item.type === 'cylinder-h') {
+            mesh.rotation.z = Math.PI / 2; // Lay down the cylinder horizontally
+          }
+          
+          // Add edges for better visibility
+          const edges = new THREE.EdgesGeometry(geo);
+          const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.3, transparent: true }));
+          mesh.add(line);
+
+          cargoGroup.add(mesh);
+        });
+      }
+
+      // Resize fix after modal is shown (display:none breaks sizes)
+      setTimeout(() => {
+        const container = document.getElementById('cargo-3d-container');
+        if(tRenderer && tCamera) {
+          tCamera.aspect = container.clientWidth / container.clientHeight;
+          tCamera.updateProjectionMatrix();
+          tRenderer.setSize(container.clientWidth, container.clientHeight);
+          tCamera.position.set(6, 5, 7);
+          tControls.target.set(0, 1, 0);
+          tControls.update();
+        }
+      }, 50);
+    }
+    
+    function closeCargoModal() { document.getElementById('cargo-3d-modal').classList.add('hidden'); }
+
+    function switchCameraPov(cam) {
+      currentPovCam = cam;
+      const d = fleetDatabase[currentVehicleId];
+      if(!d) return;
+      const img = document.getElementById('pov-video-feed');
+      img.style.opacity = 0;
+      setTimeout(() => { img.src = d.cams[cam]; img.style.opacity = 0.9; }, 150);
+      document.getElementById('pov-speed').textContent = d.speed;
+      
+      const titles = { front:'[FRONT DASH]', surround:'[360° SURROUND]', cargo:'[INSIDE CARGO]', side:'[SIDE BLIND-SPOT]' };
+      document.getElementById('pov-cam-title').textContent = `CAM #${cam.toUpperCase()} ${titles[cam]}`;
+
+      ['front','surround','cargo','side'].forEach(k => {
+        const btn = document.getElementById(`pov-btn-${k}`);
+        if(btn) btn.className = k === cam ? "px-2.5 py-1 text-[10px] font-label-tactical rounded bg-primary-container text-black font-bold" : "px-2.5 py-1 text-[10px] font-label-tactical rounded bg-surface-container text-on-surface-variant";
+      });
     }
 
     function switchPage(n) {
-      document.querySelectorAll('.page-view').forEach((el, idx) => {
-        if (idx + 1 === n) {
-          el.classList.remove('hidden');
-          el.classList.add('flex');
-        } else {
-          el.classList.add('hidden');
-          el.classList.remove('flex');
-        }
+      document.querySelectorAll('.page-view').forEach((p, i) => {
+        if(i+1 === n) p.classList.remove('hidden'); else p.classList.add('hidden');
       });
-
-      document.querySelectorAll('nav button').forEach((btn, idx) => {
-        if (idx + 1 === n) {
-          btn.className = "nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3.5rem] h-11 text-primary-container font-bold transition-colors cursor-pointer";
-        } else {
-          btn.className = "nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3.5rem] h-11 text-on-surface-variant transition-colors cursor-pointer";
-        }
+      document.querySelectorAll('.nav-item').forEach((b, i) => {
+        b.className = i+1 === n ? "nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3.5rem] h-11 text-primary-container font-bold cursor-pointer" : "nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3.5rem] h-11 text-on-surface-variant cursor-pointer";
       });
-
-      const titles = { 1: '1. 실시간 도로망 경로 관제', 2: '2. 상용차 3D 프레임 및 원격 제어', 3: '3. 무인게이트 V2I 연동 현황', 4: '4. 9대 상용차 TOS 배차 큐', 5: '5. 9대 차량 정밀 진단 및 결함 모니터링' };
-      document.getElementById('header-page-title').textContent = titles[n];
-
-      window.scrollTo(0, 0);
-      if (n === 2) {
-        setTimeout(() => { init3DViewer(); }, 150);
+      
+      if (n === 3) renderGatesPage();
+      if (n === 4) renderDispatchPage();
+      if (n === 5) {
+        if(!currentDiagVehId) currentDiagVehId = Object.keys(fleetDatabase)[0];
+        updateDiagnosticsPanel(currentDiagVehId);
       }
     }
 
-    function setGear(gear, notify = true) {
-      ['P','R','N','D'].forEach(g => {
-        const btn = document.getElementById(`gear-${g}`);
-        if(btn) {
-          if (g === gear) {
-            btn.className = "gear-btn py-2.5 rounded-lg bg-primary-container text-black font-black text-sm active:scale-95";
-          } else {
-            btn.className = "gear-btn py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-sm active:scale-95";
-          }
-        }
-      });
-      if(notify) showNotification('GEAR CHANGED', `변속단이 [ ${gear} ] (으)로 변경되었습니다.`);
-    }
-
-    function triggerEmergencyModal() {
-      document.getElementById('e-stop-modal').classList.remove('hidden');
-      document.getElementById('e-stop-modal').classList.add('flex');
-    }
-    function closeEmergencyModal() {
-      document.getElementById('e-stop-modal').classList.add('hidden');
-      document.getElementById('e-stop-modal').classList.remove('flex');
-    }
-    function confirmEmergencyStop() {
-      closeEmergencyModal();
-      showNotification('EMERGENCY STOP', '상용차 하드웨어 Fail-Safe 비상 제동이 실행되었습니다.', 'error');
-    }
-    function releaseControlAndResumeAuto() {
-      showNotification('AUTONOMOUS', '자율주행 경로 관제 모드로 복귀했습니다.');
-    }
-    function openGateInfoModal(gateId) {
-      document.getElementById('modal-gate-title').textContent = `게이트 ID: ${gateId}`;
-      document.getElementById('modal-gate-location').textContent = regionsData[currentRegion].title;
-      document.getElementById('modal-gate-last-veh').textContent = currentVehicleId;
-      document.getElementById('gate-info-modal').classList.remove('hidden');
-      document.getElementById('gate-info-modal').classList.add('flex');
-    }
-    function closeGateInfoModal() {
-      document.getElementById('gate-info-modal').classList.add('hidden');
-      document.getElementById('gate-info-modal').classList.remove('flex');
-    }
-
-    function showNotification(tag, msg, type='info') {
-      const toast = document.getElementById('tactical-toast');
+    function showNotification(tag, msg) {
+      const t = document.getElementById('tactical-toast');
       document.getElementById('toast-tag').textContent = tag;
       document.getElementById('toast-msg').textContent = msg;
-      toast.classList.remove('-translate-y-24', 'opacity-0');
-      toast.classList.add('translate-y-0', 'opacity-100');
-      setTimeout(() => {
-        toast.classList.remove('translate-y-0', 'opacity-100');
-        toast.classList.add('-translate-y-24', 'opacity-0');
-      }, 3000);
+      t.classList.remove('-translate-y-24', 'opacity-0', 'pointer-events-none');
+      if(window.toastTimer) clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => { t.classList.add('-translate-y-24', 'opacity-0', 'pointer-events-none'); }, 3000);
     }
 
-    window.addEventListener('load', () => {
-      initMap();
-      renderDispatchTable();
-      initDiagnosticsUI();
+    function setGear(g, notify=true) {
+      if(!currentVehicleId) return;
+      if(notify) showNotification('GEAR CMD', `기어 ${g} (으)로 변경`);
+      fleetDatabase[currentVehicleId].gear = g;
+      ['P','R','N','D'].forEach(k => {
+        const b = document.getElementById(`gear-${k}`);
+        if(b) b.className = k === g ? "gear-btn py-2.5 rounded-lg bg-primary-container text-black font-black text-sm active:scale-95 transition-colors shadow-[0_0_10px_rgba(0,240,255,0.4)]" : "gear-btn py-2.5 rounded-lg bg-surface-container-high text-on-surface font-bold text-sm active:scale-95 transition-colors";
+      });
+    }
+
+    function triggerEmergencyModal() { document.getElementById('e-stop-modal').classList.remove('hidden'); }
+    function closeEmergencyModal() { document.getElementById('e-stop-modal').classList.add('hidden'); }
+    function confirmEmergencyStop() { closeEmergencyModal(); showNotification('E-STOP', '긴급 제동 명령이 브로드캐스트되었습니다.'); }
+    function releaseControlAndResumeAuto() { showNotification('AUTO', '시스템이 자율주행 모드로 복귀했습니다.'); }
+    
+    function openGateInfoModal(id) {
+      const g = regionsData[currentRegion].gates.find(x => x.id === id);
+      if(!g) return;
+      document.getElementById('modal-gate-title').textContent = g.id;
+      document.getElementById('modal-gate-location').textContent = g.name;
+      document.getElementById('modal-gate-last-veh').textContent = g.status;
+      document.getElementById('gate-info-modal').classList.remove('hidden');
+    }
+    function closeGateInfoModal() { document.getElementById('gate-info-modal').classList.add('hidden'); }
+
+    document.getElementById('steerSliderInput').addEventListener('input', (e) => {
+      document.getElementById('steerValDisplay').textContent = `${e.target.value > 0?'+':''}${e.target.value}°`;
     });
+
+    function initMap() {
+      const actualMapEl = document.getElementById('actual-map');
+      if (!actualMapEl || typeof google === 'undefined' || !google.maps) return;
+
+      const defaultCenter = regionsData[currentRegion].origin;
+
+      googleMap = new google.maps.Map(actualMapEl, {
+        zoom: 11, center: defaultCenter, styles: darkMapStyle,
+        disableDefaultUI: true, zoomControl: true, mapTypeControl: false,
+        scaleControl: true, streetViewControl: false, rotateControl: false, fullscreenControl: false
+      });
+
+      changeRegion(currentRegion);
+      // Pre-initialize lists for other pages
+      renderDispatchPage();
+    }
+
+    window.onload = () => {
+      initMap();
+      // Initialize ThreeJS silently in background to avoid lag on first click
+      setTimeout(() => { if(!is3DInitialized) init3DViewer(); }, 2000); 
+    };
   </script>
 </body>
 </html>
