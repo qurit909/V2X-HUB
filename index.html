@@ -213,36 +213,6 @@
         </div>
       </section>
 
-      <!-- 3D Teleoperation & Digital Twin Canvas restored to Page 1 -->
-      <section class="bg-surface-container-low rounded-xl overflow-hidden shadow-xl border border-surface-variant/60 flex flex-col relative">
-        <div class="px-3.5 py-2.5 flex items-center justify-between bg-surface-container-high/90 backdrop-blur-md z-10 border-b border-surface-variant/40">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary-container text-[20px]">3d_rotation</span>
-            <div>
-              <span class="font-headline-sm text-[14px] text-on-surface font-bold block">3D 디지탈트윈 / 원격 텔레옵스 트랙 관제</span>
-              <span class="text-[10px] font-label-tactical text-outline block">Three.js LiDAR 포인트 클라우드 & 실시간 가상 공간 시뮬레이션</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-1">
-            <button onclick="switchMainPov('front')" id="main-pov-front" class="px-2 py-0.5 text-[9px] font-label-tactical rounded bg-primary-container text-black font-bold">1인칭</button>
-            <button onclick="switchMainPov('orbit')" id="main-pov-orbit" class="px-2 py-0.5 text-[9px] font-label-tactical rounded bg-surface-container text-on-surface-variant">3D궤도</button>
-            <button onclick="switchMainPov('surround')" id="main-pov-surround" class="px-2 py-0.5 text-[9px] font-label-tactical rounded bg-surface-container text-on-surface-variant">탑뷰</button>
-          </div>
-        </div>
-
-        <div class="relative w-full h-[320px] bg-[#05070c] overflow-hidden" id="main-threejs-container">
-          <canvas id="main-three-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
-          <div class="absolute inset-0 bg-gradient-to-b from-transparent via-primary-container/5 to-transparent pointer-events-none animate-scanline"></div>
-
-          <!-- Dashboard Speedometer HUD -->
-          <div class="absolute top-3 right-3 glass-panel px-3 py-2 rounded-xl border border-primary-container/30 flex flex-col items-center pointer-events-none">
-            <span class="font-label-tactical text-[9px] text-outline uppercase font-bold">주행 속도</span>
-            <span class="font-telemetry-display text-2xl font-black text-primary-container" id="main-speed-val">68</span>
-            <span class="font-label-tactical text-[9px] text-outline">km/h</span>
-          </div>
-        </div>
-      </section>
-
       <!-- Fleet List inside Page 1 -->
       <section class="flex flex-col gap-space-xs mt-2">
         <h3 class="font-headline-sm text-body-md font-bold text-on-surface flex items-center justify-between">
@@ -260,7 +230,7 @@
       <div class="flex items-center justify-between border-b border-surface-variant/50 pb-2">
         <div>
           <h2 class="font-headline-sm text-lg font-bold">무인게이트 V2I 스마트 연동 현황</h2>
-          <p class="text-[11px] font-label-tactical text-outline mt-0.5">선택한 권역의 스마트 게이트 및 통가 차량 현황</p>
+          <p class="text-[11px] font-label-tactical text-outline mt-0.5">선택한 권역의 스마트 게이트 및 통과 차량 현황</p>
         </div>
         <span id="gate-region-badge" class="text-[10px] font-label-tactical bg-primary-container/10 text-primary-container px-2.5 py-1 rounded-lg border border-primary-container/30">부산 권역 게이트</span>
       </div>
@@ -277,7 +247,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- PAGE 3: TOS Order & Dispatch Queue -->
     <div id="page-3" class="page-view hidden flex-col w-full px-margin py-space-md gap-space-md text-on-surface">
       <div class="flex items-center justify-between border-b border-surface-variant/50 pb-2">
@@ -336,241 +306,6 @@
         <h3 class="font-headline-sm text-body-md font-bold text-on-surface">진단 대상 차량 (클릭 시 세부 진단 모달 오픈)</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="diag-fleet-grid">
           <!-- Dynamic fleet cards by region -->
-        </div>
-      </div>
-    </div>
-
-    <!-- PAGE 5: Data Analytics & Regional Statistics -->
-    <div id="page-5" class="page-view hidden flex-col w-full px-margin py-space-md gap-space-md text-on-surface">
-      <div class="flex items-center justify-between border-b border-surface-variant/50 pb-2">
-        <div>
-          <h2 class="font-headline-sm text-lg font-bold flex items-center gap-2">
-            <span>V2X 관제 분석 & 종합 통계</span>
-            <span class="text-[10px] font-label-tactical px-2 py-0.5 rounded bg-primary-container/20 text-primary-container border border-primary-container/40">LIVE DATA</span>
-          </h2>
-          <p class="text-[11px] font-label-tactical text-outline mt-0.5">전국 권역 자율운송 트래픽, 통신 지연시간 및 운행 효율성 분석</p>
-        </div>
-        <button onclick="refreshAnalytics()" class="bg-surface-container px-3 py-1.5 rounded-lg border border-primary-container/40 text-primary-container text-[11px] font-label-tactical hover:bg-surface-variant transition-colors flex items-center gap-1 active:scale-95">
-          <span class="material-symbols-outlined text-[14px]">refresh</span> 통계 새로고침
-        </button>
-      </div>
-
-      <!-- Key Analytics Metrics Summary -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-        <div class="bg-surface-container p-3.5 rounded-xl border border-surface-variant/50 flex flex-col justify-between">
-          <span class="text-[10px] font-label-tactical text-outline">총 가동 화물 트럭</span>
-          <div class="flex items-baseline gap-2 mt-1">
-            <span class="font-telemetry-display text-2xl font-bold text-primary-container">7 대</span>
-            <span class="text-[10px] font-label-tactical text-success">100% 정상</span>
-          </div>
-          <div class="w-full bg-surface-container-highest rounded-full h-1.5 mt-2 overflow-hidden">
-            <div class="bg-primary-container h-full rounded-full" style="width: 100%"></div>
-          </div>
-        </div>
-
-        <div class="bg-surface-container p-3.5 rounded-xl border border-surface-variant/50 flex flex-col justify-between">
-          <span class="text-[10px] font-label-tactical text-outline">평균 5G V2X Latency</span>
-          <div class="flex items-baseline gap-2 mt-1">
-            <span class="font-telemetry-display text-2xl font-bold text-success">2.9 ms</span>
-            <span class="text-[10px] font-label-tactical text-success">-0.3ms</span>
-          </div>
-          <div class="w-full bg-surface-container-highest rounded-full h-1.5 mt-2 overflow-hidden">
-            <div class="bg-success h-full rounded-full" style="width: 92%"></div>
-          </div>
-        </div>
-
-        <div class="bg-surface-container p-3.5 rounded-xl border border-surface-variant/50 flex flex-col justify-between">
-          <span class="text-[10px] font-label-tactical text-outline">게이트 무인 통과율</span>
-          <div class="flex items-baseline gap-2 mt-1">
-            <span class="font-telemetry-display text-2xl font-bold text-secondary">99.4 %</span>
-            <span class="text-[10px] font-label-tactical text-secondary">+1.2%</span>
-          </div>
-          <div class="w-full bg-surface-container-highest rounded-full h-1.5 mt-2 overflow-hidden">
-            <div class="bg-secondary h-full rounded-full" style="width: 99.4%"></div>
-          </div>
-        </div>
-
-        <div class="bg-surface-container p-3.5 rounded-xl border border-surface-variant/50 flex flex-col justify-between">
-          <span class="text-[10px] font-label-tactical text-outline">탄소 절감 효율 (EV)</span>
-          <div class="flex items-baseline gap-2 mt-1">
-            <span class="font-telemetry-display text-2xl font-bold text-primary-container">4.2 톤</span>
-            <span class="text-[10px] font-label-tactical text-primary-container">금월 누적</span>
-          </div>
-          <div class="w-full bg-surface-container-highest rounded-full h-1.5 mt-2 overflow-hidden">
-            <div class="bg-primary-container h-full rounded-full" style="width: 78%"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Charts Section (Custom Pure CSS/SVG Analytics) -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <!-- V2I Latency Trend Chart -->
-        <div class="bg-surface-container p-4 rounded-xl border border-surface-variant/50 flex flex-col gap-3">
-          <div class="flex items-center justify-between border-b border-surface-variant/40 pb-2">
-            <span class="font-headline-sm text-xs font-bold text-on-surface flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[16px] text-primary-container">show_chart</span>
-              실시간 5G V2X 지연시간 (Latency Trend)
-            </span>
-            <span class="font-label-tactical text-[9px] text-outline">단위: ms</span>
-          </div>
-          <div class="h-44 w-full flex items-end justify-between gap-2 pt-4 pb-2 px-1 border-b border-surface-variant/40 relative">
-            <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
-              <div class="border-b border-primary-container border-dashed w-full"></div>
-              <div class="border-b border-outline border-dashed w-full"></div>
-              <div class="border-b border-outline border-dashed w-full"></div>
-            </div>
-            
-            <div class="flex-1 flex flex-col items-center gap-1 z-10">
-              <span class="text-[8px] font-label-tactical text-primary-container">3.1</span>
-              <div class="w-full bg-primary-container/30 hover:bg-primary-container rounded-t transition-all" style="height: 60%;"></div>
-              <span class="text-[8px] font-label-tactical text-outline">08:00</span>
-            </div>
-            <div class="flex-1 flex flex-col items-center gap-1 z-10">
-              <span class="text-[8px] font-label-tactical text-primary-container">2.8</span>
-              <div class="w-full bg-primary-container/30 hover:bg-primary-container rounded-t transition-all" style="height: 52%;"></div>
-              <span class="text-[8px] font-label-tactical text-outline">10:00</span>
-            </div>
-            <div class="flex-1 flex flex-col items-center gap-1 z-10">
-              <span class="text-[8px] font-label-tactical text-primary-container">3.5</span>
-              <div class="w-full bg-primary-container/30 hover:bg-primary-container rounded-t transition-all" style="height: 72%;"></div>
-              <span class="text-[8px] font-label-tactical text-outline">12:00</span>
-            </div>
-            <div class="flex-1 flex flex-col items-center gap-1 z-10">
-              <span class="text-[8px] font-label-tactical text-primary-container">2.6</span>
-              <div class="w-full bg-primary-container/30 hover:bg-primary-container rounded-t transition-all" style="height: 48%;"></div>
-              <span class="text-[8px] font-label-tactical text-outline">14:00</span>
-            </div>
-            <div class="flex-1 flex flex-col items-center gap-1 z-10">
-              <span class="text-[8px] font-label-tactical text-primary-container">2.9</span>
-              <div class="w-full bg-primary-container/30 hover:bg-primary-container rounded-t transition-all" style="height: 56%;"></div>
-              <span class="text-[8px] font-label-tactical text-outline">16:00</span>
-            </div>
-            <div class="flex-1 flex flex-col items-center gap-1 z-10">
-              <span class="text-[8px] font-label-tactical text-primary-container">3.0</span>
-              <div class="w-full bg-primary-container/30 hover:bg-primary-container rounded-t transition-all" style="height: 58%;"></div>
-              <span class="text-[8px] font-label-tactical text-outline">현재</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Regional Cargo Share Distribution -->
-        <div class="bg-surface-container p-4 rounded-xl border border-surface-variant/50 flex flex-col gap-3">
-          <div class="flex items-center justify-between border-b border-surface-variant/40 pb-2">
-            <span class="font-headline-sm text-xs font-bold text-on-surface flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[16px] text-secondary">pie_chart</span>
-              권역별 운송 물동량 점유율
-            </span>
-            <span class="font-label-tactical text-[9px] text-outline">실시간 오더 기준</span>
-          </div>
-
-          <div class="flex flex-col justify-center gap-3 h-44">
-            <div>
-              <div class="flex justify-between text-[10px] font-label-tactical mb-1">
-                <span>부산 권역 (부산항 ➔ 양산)</span>
-                <span class="text-primary-container font-bold">42.8% (3대 운행)</span>
-              </div>
-              <div class="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
-                <div class="bg-primary-container h-full rounded-full" style="width: 42.8%"></div>
-              </div>
-            </div>
-
-            <div>
-              <div class="flex justify-between text-[10px] font-label-tactical mb-1">
-                <span>인천 권역 (인천신항 ➔ 부천)</span>
-                <span class="text-secondary font-bold">28.6% (2대 운행)</span>
-              </div>
-              <div class="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
-                <div class="bg-secondary h-full rounded-full" style="width: 28.6%"></div>
-              </div>
-            </div>
-
-            <div>
-              <div class="flex justify-between text-[10px] font-label-tactical mb-1">
-                <span>평택 권역 (평택항 ➔ 오산)</span>
-                <span class="text-success font-bold">28.6% (2대 운행)</span>
-              </div>
-              <div class="w-full bg-surface-container-highest rounded-full h-2 overflow-hidden">
-                <div class="bg-success h-full rounded-full" style="width: 28.6%"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Vehicle Fleet Diagnostics Distribution Table -->
-      <div class="bg-surface-container p-4 rounded-xl border border-surface-variant/50 flex flex-col gap-2">
-        <h3 class="font-headline-sm text-xs font-bold text-on-surface mb-1">권역별 차종 및 BMS 상태 요약</h3>
-        <div class="overflow-x-auto">
-          <table class="w-full text-left font-label-tactical text-[11px] whitespace-nowrap">
-            <thead class="bg-surface-container-high text-outline uppercase">
-              <tr>
-                <th class="p-2.5 rounded-l-lg">권역</th>
-                <th class="p-2.5">차량 ID</th>
-                <th class="p-2.5">차종</th>
-                <th class="p-2.5">BMS SOC</th>
-                <th class="p-2.5">평균 브레이크 마모</th>
-                <th class="p-2.5 rounded-r-lg">상태</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-surface-variant/30 text-[10px]">
-              <tr>
-                <td class="p-2.5 font-bold text-primary-container">부산</td>
-                <td class="p-2.5">FL-04</td>
-                <td class="p-2.5">포터 II 1톤</td>
-                <td class="p-2.5 text-success">88%</td>
-                <td class="p-2.5">15%</td>
-                <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-success/20 text-success">정상</span></td>
-              </tr>
-              <tr>
-                <td class="p-2.5 font-bold text-primary-container">부산</td>
-                <td class="p-2.5">FL-09</td>
-                <td class="p-2.5">포터 II 1톤</td>
-                <td class="p-2.5 text-success">72%</td>
-                <td class="p-2.5">28%</td>
-                <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-success/20 text-success">정상</span></td>
-              </tr>
-              <tr>
-                <td class="p-2.5 font-bold text-primary-container">부산</td>
-                <td class="p-2.5">FL-15</td>
-                <td class="p-2.5">5톤 윙바디</td>
-                <td class="p-2.5 text-success">91%</td>
-                <td class="p-2.5">10%</td>
-                <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-success/20 text-success">정상</span></td>
-              </tr>
-              <tr>
-                <td class="p-2.5 font-bold text-secondary">인천</td>
-                <td class="p-2.5">FL-21</td>
-                <td class="p-2.5">5톤 카고</td>
-                <td class="p-2.5 text-success">80%</td>
-                <td class="p-2.5">18%</td>
-                <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-success/20 text-success">정상</span></td>
-              </tr>
-              <tr>
-                <td class="p-2.5 font-bold text-secondary">인천</td>
-                <td class="p-2.5">FL-28</td>
-                <td class="p-2.5">포터 II 1톤</td>
-                <td class="p-2.5 text-success">84%</td>
-                <td class="p-2.5">12%</td>
-                <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-success/20 text-success">정상</span></td>
-              </tr>
-              <tr>
-                <td class="p-2.5 font-bold text-success">평택</td>
-                <td class="p-2.5">FL-33</td>
-                <td class="p-2.5">포터 II 1톤</td>
-                <td class="p-2.5 text-success">95%</td>
-                <td class="p-2.5">8%</td>
-                <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-success/20 text-success">정상</span></td>
-              </tr>
-              <tr>
-                <td class="p-2.5 font-bold text-success">평택</td>
-                <td class="p-2.5">FL-38</td>
-                <td class="p-2.5">5톤 윙바디</td>
-                <td class="p-2.5 text-secondary">65%</td>
-                <td class="p-2.5 text-secondary">32%</td>
-                <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-secondary/20 text-secondary">점검 권장</span></td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -748,29 +483,24 @@
     </div>
   </div>
 
-  <!-- Bottom Nav Tabs (5 Pages) -->
+  <!-- Bottom Nav Tabs (4 Clean Pages System) -->
   <nav class="fixed bottom-0 w-full z-40 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl border-t border-surface-variant/40 shadow-[0_-2px_16px_rgba(0,0,0,0.6)]">
     <div class="flex justify-around items-center h-14 px-space-xs max-w-7xl mx-auto">
-      <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3rem] h-11 text-primary-container font-bold transition-colors cursor-pointer" onclick="switchPage(1)">
-        <span class="material-symbols-outlined text-[18px]">map</span>
-        <span class="font-label-tactical text-[9px] text-center leading-none">경로관제</span>
+      <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[4rem] h-11 text-primary-container font-bold transition-colors cursor-pointer" onclick="switchPage(1)">
+        <span class="material-symbols-outlined text-[20px]">map</span>
+        <span class="font-label-tactical text-[10px] text-center leading-none">경로관제</span>
       </button>
-      <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3rem] h-11 text-on-surface-variant transition-colors cursor-pointer" onclick="switchPage(2)">
-        <span class="material-symbols-outlined text-[18px]">sensor_door</span>
-        <span class="font-label-tactical text-[9px] text-center leading-none">게이트현황</span>
+      <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[4rem] h-11 text-on-surface-variant transition-colors cursor-pointer" onclick="switchPage(2)">
+        <span class="material-symbols-outlined text-[20px]">sensor_door</span>
+        <span class="font-label-tactical text-[10px] text-center leading-none">게이트현황</span>
       </button>
-      <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3rem] h-11 text-on-surface-variant transition-colors cursor-pointer" onclick="switchPage(3)">
-        <span class="material-symbols-outlined text-[18px]">list_alt</span>
-        <span class="font-label-tactical text-[9px] text-center leading-none">오더배차</span>
+      <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[4rem] h-11 text-on-surface-variant transition-colors cursor-pointer" onclick="switchPage(3)">
+        <span class="material-symbols-outlined text-[20px]">list_alt</span>
+        <span class="font-label-tactical text-[10px] text-center leading-none">오더배차</span>
       </button>
-      <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3rem] h-11 text-on-surface-variant transition-colors cursor-pointer" onclick="switchPage(4)">
-        <span class="material-symbols-outlined text-[18px]">build_circle</span>
-        <span class="font-label-tactical text-[9px] text-center leading-none">차량진단</span>
-      </button>
-      <!-- NEW 5TH PAGE TAB -->
-      <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[3rem] h-11 text-on-surface-variant transition-colors cursor-pointer" onclick="switchPage(5)">
-        <span class="material-symbols-outlined text-[18px]">insights</span>
-        <span class="font-label-tactical text-[9px] text-center leading-none">데이터분석</span>
+      <button class="nav-item flex flex-col items-center justify-center gap-0.5 min-w-[4rem] h-11 text-on-surface-variant transition-colors cursor-pointer" onclick="switchPage(4)">
+        <span class="material-symbols-outlined text-[20px]">build_circle</span>
+        <span class="font-label-tactical text-[10px] text-center leading-none">차량진단</span>
       </button>
     </div>
   </nav>
@@ -779,7 +509,6 @@
   <script>
     let currentRegion = 'busan';
     let currentModalVehicleId = 'FL-04';
-    let currentVehicleType = 'porter';
     let currentCameraPov = 'front';
     
     // Google Maps
@@ -793,10 +522,6 @@
     let lidarPointCloud = null;
     let wheelsList = [];
     let currentSteerAngle = 0;
-
-    // Three.js 3D Objects (Main View)
-    let mainScene, mainCamera, mainRenderer, mainOrbitControls;
-    let mainPorterGroup, mainLidarCloud;
 
     // Regions Database
     const regionsData = {
@@ -972,70 +697,6 @@
       modalScene.add(lidarPointCloud);
 
       animate3DModalScene();
-    }
-
-    function initMainThreeJSView() {
-      const container = document.getElementById('main-threejs-container');
-      const canvas = document.getElementById('main-three-canvas');
-      if (!container || !canvas) return;
-
-      const width = container.clientWidth || 600;
-      const height = container.clientHeight || 320;
-
-      mainScene = new THREE.Scene();
-      mainScene.background = new THREE.Color(0x05070c);
-      mainScene.fog = new THREE.FogExp2(0x05070c, 0.02);
-
-      mainCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-      mainCamera.position.set(5, 3.5, 7);
-
-      mainRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-      mainRenderer.setSize(width, height);
-      mainRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-      mainOrbitControls = new THREE.OrbitControls(mainCamera, mainRenderer.domElement);
-      mainOrbitControls.enableDamping = true;
-
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-      mainScene.add(ambientLight);
-
-      const dirLight = new THREE.DirectionalLight(0x00dbe9, 1.2);
-      dirLight.position.set(10, 20, 10);
-      mainScene.add(dirLight);
-
-      const gridHelper = new THREE.GridHelper(60, 60, 0x00f0ff, 0x141824);
-      gridHelper.position.y = -0.01;
-      mainScene.add(gridHelper);
-
-      mainPorterGroup = createHyundaiPorterModel();
-      mainScene.add(mainPorterGroup);
-
-      mainLidarCloud = createLidarPointCloud();
-      mainScene.add(mainLidarCloud);
-
-      animateMain3DScene();
-    }
-
-    function animateMain3DScene() {
-      requestAnimationFrame(animateMain3DScene);
-      if (mainOrbitControls) mainOrbitControls.update();
-      if (mainLidarCloud) mainLidarCloud.rotation.y += 0.008;
-      if (mainRenderer && mainScene && mainCamera) mainRenderer.render(mainScene, mainCamera);
-    }
-
-    function switchMainPov(pov) {
-      if (!mainCamera || !mainOrbitControls) return;
-      if (pov === 'front') {
-        mainCamera.position.set(0, 1.3, 0.9);
-        mainOrbitControls.target.set(0, 1.3, 10);
-      } else if (pov === 'orbit') {
-        mainCamera.position.set(5, 3.5, 7);
-        mainOrbitControls.target.set(0, 1, 0);
-      } else if (pov === 'surround') {
-        mainCamera.position.set(0, 12, 0.1);
-        mainOrbitControls.target.set(0, 0, 0);
-      }
-      mainOrbitControls.update();
     }
 
     function createHyundaiPorterModel() {
@@ -1373,8 +1034,7 @@
         '1. 실시간 도로망 경로 관제',
         '2. 무인게이트 V2I 연동 현황',
         '3. TOS 연동 실시간 배차 큐',
-        '4. 권역별 차량 정밀 진단',
-        '5. V2X 자율관제 종합 데이터 분석'
+        '4. 권역별 차량 정밀 진단'
       ];
       document.getElementById('header-page-title').textContent = titles[pageNum - 1];
     }
@@ -1440,10 +1100,6 @@
       showNotification('ECU REBOOT', `${currentModalVehicleId} 차량의 ECU 제어기가 재부팅되었습니다.`);
     }
 
-    function refreshAnalytics() {
-      showNotification('ANALYTICS', 'V2X 관제 통계 및 트래픽 분석 데이터를 최신화했습니다.');
-    }
-
     window.onload = function() {
       const mapContainer = document.getElementById('actual-map');
       if (mapContainer) {
@@ -1465,7 +1121,6 @@
       }
 
       initThreeJSInModal();
-      initMainThreeJSView();
       changeRegion('busan');
     };
   </script>
